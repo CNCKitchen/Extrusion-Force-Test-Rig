@@ -16,8 +16,6 @@ void loop() {
   digitalWrite(HIGH_PIN,HIGH);
   double temp = myHotEnd.getTemperature();
   Serial.println(temp);
-  delay(200);
-  Serial.print("dsljkhdlf");
   delay(1000);
 }
 
