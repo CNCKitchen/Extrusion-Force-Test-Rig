@@ -37,7 +37,7 @@ private:
 
   // A4988 OHNE Jumper auf MS1..MS3 -> Vollschritt (1)
   // Wenn du wieder auf TMC2209 (typisch 1/16) wechselst -> 16
-  static constexpr int   _MICROSTEPPING = 16;
+  static constexpr int   _MICROSTEPPING = 1;
 
   static constexpr bool  _ENABLE_ACTIVE_LOW = true; // EN low = enable (A4988 meist so)
 

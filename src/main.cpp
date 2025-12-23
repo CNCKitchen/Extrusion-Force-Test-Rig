@@ -11,7 +11,7 @@
 
 
 // Hot-End
-#define NTC_PIN 5
+#define NTC_PIN 4
 #define HEATER_PIN 6
 #define FAN_PIN 7
 
@@ -20,7 +20,7 @@
 #define LOADCELL_SCK_PIN 3
 
 // Rotary Encoder
-#define ROTARY_ENCODER_PIN 4
+#define ROTARY_ENCODER_PIN 5
 
 //========== Objekte ==========//
 HotEnd myHotEnd(HEATER_PIN, NTC_PIN, FAN_PIN);
@@ -44,9 +44,9 @@ void stepper_task(void* parameters);
 void hotEnd_task(void* parameters);
 
 void setup(){
+  delay(4000);
   Serial.begin(115200);
   extruder.begin(3000, 3000);
-  delay(5000);
   // Queues
   tempQueueHandle = xQueueCreate(TEMP_QUEUE_LENGTH, TEMP_QUEUE_SIZE);
   if(tempQueueHandle == NULL) Serial.println("Fehler beim erstellen der Temperatur Queue");
@@ -64,6 +64,7 @@ void setup(){
   if (xTaskCreatePinnedToCore (hotEnd_task, "Hot end Task", 6144, nullptr, 1, &hotEndTaskHandle, 0) != pdPASS) {
     Serial.println("Fehler beim erstellen von Stepper Task");
   }
+  Serial.println("Start");
   
 }
 
