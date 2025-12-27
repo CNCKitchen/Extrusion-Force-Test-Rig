@@ -1,4 +1,5 @@
-#pragma once
+#ifndef ExtruderStepper_h
+#define ExtruderStepper_h
 #include <Arduino.h>
 #include <AccelStepper.h>
 
@@ -49,3 +50,5 @@ private:
   float   _stepsPerMM;
   AccelStepper _stepper;
 };
+
+#endif

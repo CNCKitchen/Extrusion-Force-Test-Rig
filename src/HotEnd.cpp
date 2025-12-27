@@ -36,8 +36,9 @@ double HotEnd::getNtcVoltage() {
         //sum_res += res_ntc;
         sum_res+=U_out_esp;
     }
-    return sum_res / _SAMPLE_COUNT; // Mittelwert in Ohm
+    return sum_res / _SAMPLE_COUNT; // Mittelwert in Volt
 }
+
 /*
 float HotEnd::getTemperature() {
     double resOhm = getNtcResistance();
@@ -87,6 +88,42 @@ float HotEnd::getTemperature() {
     float k=(t1-t2)/(v1-v2);
     float d=t2;
     return k*(esp_voltage-v2)+d;
+}
+
+void HotEnd::piController(float temp, float dt, const float setPoint){
+    if (temp > _T_MAX_SAFE) {
+        Serial.println("Maximale Temperatur von 290°C überschritten! Heizer AUS.");
+        _integralTerm   = 0.0f;
+        _controlOutput  = 0.0f;
+        setHeaterPwm(0);          
+        return;
+    }
+
+    if(temp < 0){
+        Serial.println("Minimale Temperatur von 0°C darf nicht unterschritten werden! Heizer AUS.");
+        _integralTerm   = 0.0f;
+        _controlOutput  = 0.0f;
+        return;
+    }
+    float error =  setPoint - temp;
+    // I-Anteil integrieren: Fehler [°C] * dt [s]
+    _integralTerm += error * dt;
+
+    // Integral in Ausgangsgrenzen beschneiden
+    if (_integralTerm > _OUT_MAX) _integralTerm = _OUT_MAX;
+    if (_integralTerm < _OUT_MIN) _integralTerm = _OUT_MIN;
+
+    // PI-Ausgang
+    float u = _Kp * error + _Ki * _integralTerm;
+
+    // Stellgröße begrenzen
+    if (u > _OUT_MAX) u = _OUT_MAX;
+    if (u < _OUT_MIN) u = _OUT_MIN;
+    _controlOutput = u;
+
+    // PWM-Wert (0..255) schreiben
+    uint8_t pwmValue = static_cast<uint8_t>(_controlOutput);
+    setHeaterPwm(pwmValue);
 }
 
 
@@ -181,8 +218,6 @@ const HotEnd::_NtcPoint HotEnd::_ntcTable[HotEnd::_NTC_TABLE_SIZE] = {
 };
 */
 
-
-
 /*
 // Interpolation der Temperatur aus Tabelle
 float HotEnd::temperatureFromResistance(float rKOhm) {
@@ -210,5 +245,6 @@ float HotEnd::temperatureFromResistance(float rKOhm) {
     // sollte nie erreicht werden
     return _ntcTable[_NTC_TABLE_SIZE - 1].tempC;
 }
-
 */
+
+

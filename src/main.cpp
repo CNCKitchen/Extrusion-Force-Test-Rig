@@ -9,11 +9,14 @@
 #define STEP_PIN    10
 #define DIR_PIN     9
 
-
 // Hot-End
 #define NTC_PIN 4
 #define HEATER_PIN 6
 #define FAN_PIN 7
+
+// Hot-End PI-Regler
+#define HEATER_DELAY 100
+#define HEATER_SET_POINT 200
 
 // Load Cell
 #define LOADCELL_DOUT_PIN 8
@@ -46,6 +49,7 @@ void hotEnd_task(void* parameters);
 void setup(){
   delay(4000);
   Serial.begin(115200);
+  
   extruder.begin(3000, 3000);
   // Queues
   tempQueueHandle = xQueueCreate(TEMP_QUEUE_LENGTH, TEMP_QUEUE_SIZE);
@@ -69,6 +73,7 @@ void setup(){
 }
 
 void loop(){
+
 
   vTaskDelay(pdMS_TO_TICKS(50));
 }
@@ -123,6 +128,8 @@ void hotEnd_task(void* parameters){
         myHotEnd.setHeaterPwm(0);
         myHotEnd.setFanPwm(180);   
       }
-      vTaskDelay(pdMS_TO_TICKS(100));
+      //const float dt_s = HEATER_DELAY / 1000.0f;  
+      //myHotEnd.piController(temp, dt_s,HEATER_SET_POINT);
+      vTaskDelay(pdMS_TO_TICKS(HEATER_DELAY));
     }
 }

@@ -17,13 +17,15 @@ class HotEnd{
         // Lüfter ansteuern (0..255)
         void setFanPwm(uint8_t pwmValue);
 
-
         // NTC-Widerstand in Ohm (gemittelt)
         double getNtcVoltage(void);
         
         // Temperatur in °C (aus Tabelle + Interpolation)
         float getTemperature();
-        
+
+        // PI-Regelung für Hot-End
+        void piController(float temp, float dt, const float setPoint);
+
     private:
 
         //========== Funktions-Prototypen  ==========//
@@ -59,6 +61,17 @@ class HotEnd{
 
         static constexpr size_t _NTC_TABLE_SIZE = 15;
         static const _NtcPoint _ntcTable[_NTC_TABLE_SIZE];
+
+        // Regler
+        static constexpr float _OUT_MIN = 0.0f;
+        static constexpr float _OUT_MAX = 255.0f;
+        static constexpr float _T_MAX_SAFE = 290.0f;   // Sicherheitsgrenze
+
+        static constexpr float _Kp = 9.3010f;
+        static constexpr float _Ki = 0.9310f;
+
+        float _integralTerm = 0.0f;        // integrierter I-Anteil
+        float _controlOutput = 0.0f;       // Stellgröße (0..255)
 
 };
 
