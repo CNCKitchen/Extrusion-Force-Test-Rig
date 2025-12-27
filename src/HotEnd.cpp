@@ -103,15 +103,17 @@ void HotEnd::piController(float temp, float dt, const float setPoint){
         Serial.println("Minimale Temperatur von 0°C darf nicht unterschritten werden! Heizer AUS.");
         _integralTerm   = 0.0f;
         _controlOutput  = 0.0f;
+        setHeaterPwm(0);
         return;
     }
+
     float error =  setPoint - temp;
     // I-Anteil integrieren: Fehler [°C] * dt [s]
     _integralTerm += error * dt;
 
     // Integral in Ausgangsgrenzen beschneiden
-    if (_integralTerm > _OUT_MAX) _integralTerm = _OUT_MAX;
-    if (_integralTerm < _OUT_MIN) _integralTerm = _OUT_MIN;
+    if (_integralTerm >  _OUT_MAX) _integralTerm =  _OUT_MAX;
+    if (_integralTerm < -_OUT_MAX) _integralTerm = -_OUT_MAX;
 
     // PI-Ausgang
     float u = _Kp * error + _Ki * _integralTerm;
