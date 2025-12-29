@@ -32,15 +32,13 @@ public:
   void  resetExtrudedMm();
 
 private:
-  // ===== Mechanik / Kalibrierung =====
   // Hemera Datenblatt: nominal steps/mm bei 1/16 = 397
   static constexpr float _STEPS_PER_MM_X16 = 397.0f;
 
-  // A4988 OHNE Jumper auf MS1..MS3 -> Vollschritt (1)
-  // Wenn du wieder auf TMC2209 (typisch 1/16) wechselst -> 16
-  static constexpr int   _MICROSTEPPING = 1;
+  // TMC2209 
+  static constexpr int   _MICROSTEPPING = 8;
 
-  static constexpr bool  _ENABLE_ACTIVE_LOW = true; // EN low = enable (A4988 meist so)
+  static constexpr bool  _ENABLE_ACTIVE_LOW = true; 
 
   int32_t _lastStepPos = 0;     // letzter gemessener Stepper-Positionswert (Steps)
   int64_t _extrudedSteps = 0;   // aufsummierte Steps seit Start

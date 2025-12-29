@@ -17,7 +17,7 @@ void ExtruderStepper::begin(float maxSpeedStepsPerS, float accelStepsPerS2) {
 
   // A4988 mag saubere STEP-Pulse
   _stepper.setMinPulseWidth(2);
-  //_stepper.setPinsInverted(true);
+  _stepper.setPinsInverted(true);
   _stepper.setMaxSpeed(maxSpeedStepsPerS);
   _stepper.setAcceleration(accelStepsPerS2);
 
