@@ -185,11 +185,15 @@ void hotEnd_task(void* parameters){
         timeStamp = millis(); // Zeitstempel setzten wenn Messung beginnt
         tempReached = true;                 
         
+        // Stepper
         vTaskResume(stepperTaskHandle);
         extrusion_per_s_in_mm = (float)extrusion_per_min_in_mm / 60.0f;
         extruder.setFilamentSpeedMmS(extrusion_per_s_in_mm);
         extruder.enable(true);               // WICHTIG!
         extruder.resetExtrudedMm(); // muss aufgerufen werden damit Filamentlängenzählung und Zeitzählung neu beginnt
+
+        // Encoder
+        if(!myEncoder.start_counter()) Serial.print("Fehler beim Encoderstart");
 
         vTaskResume(RotEncoderTaskHandle);
         vTaskResume(loadCellTaskHandle);
@@ -243,6 +247,9 @@ void controller_task(void* parameters){
       tempReached = false;
       stopAllActuators();
       Serial.println("Die Messung ist abgeschlossen");
+
+      // Encoder reseten
+      if(!myEncoder.reset()) Serial.println("Fehler beim reseten des Encoders");
 
       // Alle Sensoren und Aktoren abschalten
       vTaskSuspend(stepperTaskHandle);
