@@ -39,14 +39,6 @@ double HotEnd::getNtcVoltage() {
     return sum_res / _SAMPLE_COUNT; // Mittelwert in Volt
 }
 
-/*
-float HotEnd::getTemperature() {
-    double resOhm = getNtcResistance();
-    float rKOhm = static_cast<float>(resOhm / 1000.0); // Ohm -> kΩ
-    return temperatureFromResistance(rKOhm);
-}
-*/
-
 float HotEnd::getTemperature() {
     double esp_voltage = getNtcVoltage();
     float v1; //unterer Stützwert, Spannung
@@ -90,12 +82,18 @@ float HotEnd::getTemperature() {
     return k*(esp_voltage-v2)+d;
 }
 
+float HotEnd::getPower(uint8_t pwmVal){
+    float D = static_cast<float>(pwmVal) / 255.0f;  // oder pwmVal / 255.0f;
+    float power = D * _powerHeater;                 // z.B. _powerHeater = 40.0f;
+    return power;
+}
+
 void HotEnd::piController(float temp, float dt, const float setPoint){
     if (temp > _T_MAX_SAFE) {
         Serial.println("Maximale Temperatur von 290°C überschritten! Heizer AUS.");
         _integralTerm   = 0.0f;
         _controlOutput  = 0.0f;
-        setHeaterPwm(0);          
+        setHeaterPwm(0);       
         return;
     }
 
@@ -126,6 +124,8 @@ void HotEnd::piController(float temp, float dt, const float setPoint){
     // PWM-Wert (0..255) schreiben
     uint8_t pwmValue = static_cast<uint8_t>(_controlOutput);
     setHeaterPwm(pwmValue);
+    Serial.print(">Power:");
+    Serial.println(getPower(pwmValue));
 }
 
 
@@ -150,103 +150,5 @@ const HotEnd::_NtcPoint HotEnd::_ntcTable[HotEnd::_NTC_TABLE_SIZE] = {
     {0.084000, 286.803040}
     //eventuell nochmals Stüztwert mit 90 Ohm
 };
-
-// NTC 104NT-4-R025H42G
-// Tabelle: { temperature [°C], resistance [kΩ] }
-
-/*
-const HotEnd::_NtcPoint HotEnd::_ntcTable[HotEnd::_NTC_TABLE_SIZE] = {
-    {   0.0f, 354.6f  },
-    {   5.0f, 270.8f  },
-    {  10.0f, 208.8f  },
-    {  15.0f, 162.1f  },
-    {  20.0f, 126.9f  },
-    {  25.0f, 100.0f  },
-    {  30.0f,  79.33f },
-    {  35.0f,  63.32f },
-    {  40.0f,  50.90f },
-    {  45.0f,  41.13f },
-    {  50.0f,  33.45f },
-    {  55.0f,  27.34f },
-    {  60.0f,  22.48f },
-    {  65.0f,  18.57f },
-    {  70.0f,  15.43f },
-    {  75.0f,  12.88f },
-    {  80.0f,  10.80f },
-    {  85.0f,   9.094f },
-    {  90.0f,   7.690f },
-    {  95.0f,   6.530f },
-    { 100.0f,   5.569f },
-    { 105.0f,   4.767f },
-    { 110.0f,   4.097f },
-    { 115.0f,   3.533f },
-    { 120.0f,   3.058f },
-    { 125.0f,   2.655f },
-    { 130.0f,   2.313f },
-    { 135.0f,   2.020f },
-    { 140.0f,   1.770f },
-    { 145.0f,   1.556f },
-    { 150.0f,   1.371f },
-    { 155.0f,   1.212f },
-    { 160.0f,   1.074f },
-    { 165.0f,   0.9544f },
-    { 170.0f,   0.8501f },
-    { 175.0f,   0.7590f },
-    { 180.0f,   0.6793f },
-    { 185.0f,   0.6092f },
-    { 190.0f,   0.5476f },
-    { 195.0f,   0.4932f },
-    { 200.0f,   0.4452f },
-    { 205.0f,   0.4027f },
-    { 210.0f,   0.3650f },
-    { 215.0f,   0.3314f },
-    { 220.0f,   0.3016f },
-    { 225.0f,   0.2749f },
-    { 230.0f,   0.2510f },
-    { 235.0f,   0.2296f },
-    { 240.0f,   0.2104f },
-    { 245.0f,   0.1931f },
-    { 250.0f,   0.1775f },
-    { 255.0f,   0.1634f },
-    { 260.0f,   0.1507f },
-    { 265.0f,   0.1391f },
-    { 270.0f,   0.1287f },
-    { 275.0f,   0.1191f },
-    { 280.0f,   0.1105f },
-    { 285.0f,   0.1026f },
-    { 290.0f,   0.09539f },
-    { 295.0f,   0.08881f },
-    { 300.0f,   0.08278f }
-};
-*/
-
-/*
-// Interpolation der Temperatur aus Tabelle
-float HotEnd::temperatureFromResistance(float rKOhm) {
-    // Unterhalb/oberhalb des Tabellenbereichs clampen
-    if (rKOhm >= _ntcTable[0].resKOhm) {
-        return _ntcTable[0].tempC;     // kälter als 0°C
-    }
-    if (rKOhm <= _ntcTable[_NTC_TABLE_SIZE - 1].resKOhm) {
-        return _ntcTable[_NTC_TABLE_SIZE - 1].tempC; // heißer als 300°C
-    }
-    // Widerstand nimmt mit Temperatur ab -> wir suchen das Intervall
-    for (size_t i = 0; i < _NTC_TABLE_SIZE - 1; ++i) {
-        float r1 = _ntcTable[i].resKOhm;
-        float r2 = _ntcTable[i + 1].resKOhm;
-
-        if (rKOhm <= r1 && rKOhm >= r2) {
-            float t1 = _ntcTable[i].tempC;
-            float t2 = _ntcTable[i + 1].tempC;
-
-            // lineare Interpolation in R
-            float alpha = (rKOhm - r1) / (r2 - r1); // r2 < r1 -> Nenner negativ, passt
-            return t1 + alpha * (t2 - t1);
-        }
-    }
-    // sollte nie erreicht werden
-    return _ntcTable[_NTC_TABLE_SIZE - 1].tempC;
-}
-*/
 
 

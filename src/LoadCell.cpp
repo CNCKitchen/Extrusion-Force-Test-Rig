@@ -33,7 +33,6 @@ double LoadCell::getMeanWheight(const uint8_t NUM_SAMPLES){
 }
 
 double LoadCell::getRawWheight(){
-
     static double lastWeight = 0.0;  // letzter gültiger Gewichtswert
     static bool hasRaw = false;      // gibt es schon einen gültigen Rohwert?
 
@@ -46,10 +45,6 @@ double LoadCell::getRawWheight(){
 
         return weight;               // neuer gültiger Messwert
     }
-    else {
-        Serial.println("HX711 not found.");
-    }
-
     // Hier landen wir, wenn gerade kein neuer Wert gelesen werden konnte
     if (hasRaw) {
         // letzten gültigen Wert zurückgeben
@@ -60,10 +55,13 @@ double LoadCell::getRawWheight(){
     }
 }
 
+float LoadCell::getForce(){
+    return 9.81 * (getMeanWheight(2) / 1000); // Kraft in N 
+}
 //========== Private Funktions-Implementierungen  ==========//
 
 double LoadCell::calcWeight(long analogVal){
  // return 0.010008  * analogVal - 1838.82;
  //Gewicht[g] ≈ 0.009557 * ADC + -1710.042129
- return 0.009557 * analogVal - 1828.82;
+ return 0.009557 * analogVal - 1892.82;
 }

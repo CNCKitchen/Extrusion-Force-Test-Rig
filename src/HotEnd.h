@@ -16,13 +16,12 @@ class HotEnd{
 
         // Lüfter ansteuern (0..255)
         void setFanPwm(uint8_t pwmValue);
-
-        // NTC-Spannung in Volt (gemittelt)
-        double getNtcVoltage(void);
-        //Kommentar von ballandoSullaTastiera: Warum ist diese Funktion nicht private?
         
         // Temperatur in °C (aus Tabelle + Interpolation)
         float getTemperature();
+
+        // Leistung in W am Hot End
+        float getPower(uint8_t pwmVal);
 
         // PI-Regelung für Hot-End
         void piController(float temp, float dt, const float setPoint);
@@ -33,6 +32,10 @@ class HotEnd{
 
         // aus Widerstand (kΩ) Temperatur interpolieren
         static float temperatureFromResistance(float rKOhm); 
+
+        // NTC-Spannung in Volt (gemittelt)
+        double getNtcVoltage(void);
+        //Kommentar von ballandoSullaTastiera: Warum ist diese Funktion nicht private?
 
         //========== Variablen  ==========//
 
@@ -68,12 +71,16 @@ class HotEnd{
         static constexpr float _OUT_MAX = 255.0f;
         static constexpr float _T_MAX_SAFE = 290.0f;   // Sicherheitsgrenze
 
-        static constexpr float _Kp = 9.3010f;
-        static constexpr float _Ki = 0.9310f;
+        //static constexpr float _Kp = 9.3010f;
+        // static constexpr float _Ki = 0.9310f;
+        static constexpr float _Kp = 0.8f;
+        static constexpr float _Ki = 0.0f;
 
         float _integralTerm = 0.0f;        // integrierter I-Anteil
         float _controlOutput = 0.0f;       // Stellgröße (0..255)
 
+        // Heizelement
+        static constexpr float _powerHeater = 40; // Leistung Hot End in Watt
 };
 
 #endif

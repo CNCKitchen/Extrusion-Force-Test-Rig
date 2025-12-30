@@ -13,7 +13,7 @@ class LoadCell{
         //========== Funktions-Prototypen  ==========//
         double getMeanWheight(const uint8_t NUM_SAMPLES);
         double getRawWheight();
-
+        float getForce();
     private:
 
         //========== Funktions-Prototypen  ==========//

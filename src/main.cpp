@@ -7,7 +7,7 @@
 #include "GUICommunication.h"
 
 // Messung 
-#define MEASURE_TIMER_MIN 0.5 // Zeit einer Messung in Minuten
+#define MEASURE_TIMER_MIN 1.5 // Zeit einer Messung in Minuten
 
 // Stepper 
 #define EN_PIN     11
@@ -15,7 +15,7 @@
 #define DIR_PIN     9
 
 float extrusion_per_s_in_mm = 0.0f;
-uint32_t extrusion_per_min_in_mm = 0;
+uint32_t extrusion_per_min_in_mm = 300;
 
 // Hot-End
 #define NTC_PIN 4
@@ -24,9 +24,8 @@ uint32_t extrusion_per_min_in_mm = 0;
 
 // Hot-End PI-Regler
 #define HEATER_DELAY 100
-#define HEATER_SET_POINT 220
 
-uint32_t heater_temp_target; //ersetzt HEATER_SET_POINT
+uint32_t heater_temp_target = 200; //ersetzt HEATER_SET_POINT
 uint32_t hot_end_abschalten;
 
 // Load Cell
@@ -72,6 +71,8 @@ void serial_task(void* parameters);
 void rotEncoder_task(void* parameters);
 void controller_task(void* parameters);
 void stopAllActuators(void);
+
+
 
 void setup(){
   Serial.begin(115200);
@@ -129,9 +130,9 @@ void loop(){
 
 void loadCell_task(void* parameters){
   for(;;){
-    float wheight = myLoadCell.getMeanWheight(4);
-    //Serial.print(">wheight:");
-    //Serial.println(wheight, 3);      
+    float force = myLoadCell.getForce();
+    Serial.print(">Force:");
+    Serial.println(force, 3);      
     vTaskDelay(pdMS_TO_TICKS(100));
   }
 }
@@ -155,11 +156,7 @@ void rotEncoder_task(void* parameters){
   for(;;){
     float ist = myEncoder.get_length();
     float soll = extruder.getExtrudedMmSinceStart();
-    float schlupf = (1-(ist/soll))*100   //schlupf in %
-    Serial.print(">Ist length:");
-    Serial.println(ist);
-    Serial.print(">Soll length:");
-    Serial.println(soll);
+    float schlupf = (1-(ist/soll))*100;   //schlupf in %
     Serial.print(">Schlupf %:");
     Serial.println(schlupf);
     vTaskDelay(pdMS_TO_TICKS(100));
@@ -175,15 +172,31 @@ void hotEnd_task(void* parameters){
       Serial.print(">temp:");
       Serial.println(temp, 2);   
       
-      if (temp < heater_temp_target) {
-        myHotEnd.setHeaterPwm(255);
-        myHotEnd.setFanPwm(180);   
-      } 
-      else {
-        myHotEnd.setHeaterPwm(0);
-        myHotEnd.setFanPwm(180);   
+      if (temp >= heater_temp_target) {
+          // über oder am Soll: Heizer aus
+          myHotEnd.setHeaterPwm(0);
+          float power = myHotEnd.getPower(0);
+          myHotEnd.setFanPwm(180);
+          Serial.print(">Power:");
+          Serial.println(power);
       }
-
+      else if (temp >= (heater_temp_target - 20.0f)) {
+          // im Band: 20°C unter Soll bis Soll -> halbe Leistung
+          myHotEnd.setHeaterPwm(128);
+          float power = myHotEnd.getPower(128);
+          myHotEnd.setFanPwm(180);
+          Serial.print(">Power:");
+          Serial.println(power);
+      }
+      else {
+          // weiter als 20°C unter Soll: Vollgas
+          myHotEnd.setHeaterPwm(255);
+          float power = myHotEnd.getPower(255);
+          myHotEnd.setFanPwm(180);
+          Serial.print(">Power:");
+          Serial.println(power);
+      }
+      
       if (!tempReached && temp >= heater_temp_target) {
         timeStamp = millis(); // Zeitstempel setzten wenn Messung beginnt
         tempReached = true;                 
