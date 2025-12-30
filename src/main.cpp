@@ -3,11 +3,14 @@
 #include "HotEnd.h"
 #include "LoadCell.h"
 #include "ExtruderStepper.h"
+#include "GUICommunication.h"
 
 // Stepper 
 #define EN_PIN     11
 #define STEP_PIN    10
 #define DIR_PIN     9
+
+uint32_t extrusion_per_min_in_mm;
 
 // Hot-End
 #define NTC_PIN 4
@@ -17,6 +20,9 @@
 // Hot-End PI-Regler
 #define HEATER_DELAY 100
 #define HEATER_SET_POINT 220
+
+uint32_t heater_temp_target; //ersetzt HEATER_SET_POINT
+uint32_t hot_end_abschalten;
 
 // Load Cell
 #define LOADCELL_DOUT_PIN 8
@@ -29,6 +35,8 @@
 HotEnd myHotEnd(HEATER_PIN, NTC_PIN, FAN_PIN);
 LoadCell myLoadCell(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
 ExtruderStepper extruder(STEP_PIN, DIR_PIN, EN_PIN);
+GUICom my_GUI;
+
 
 //========== Tasks ==========//
 TaskHandle_t loadCellTaskHandle = NULL;
@@ -65,7 +73,7 @@ void setup(){
   if (xTaskCreatePinnedToCore (loadCell_task, "Load Cell Task", 6144, nullptr, 1, &loadCellTaskHandle, 0) != pdPASS) {
     Serial.println("Fehler beim erstellen von Load Cell Task");
   }
-  //vTaskSuspend(loadCellTaskHandle); // Task vorerst anhalten
+  vTaskSuspend(loadCellTaskHandle); // Task vorerst anhalten
 
   if (xTaskCreatePinnedToCore (NTC_task, "NTC Task", 6144, nullptr, 1, &NTCTaskHandle, 0) != pdPASS) {
     Serial.println("Fehler beim erstellen von NTC Task");
@@ -75,7 +83,7 @@ void setup(){
   if (xTaskCreatePinnedToCore (stepper_task, "Stepper Task", 6144, nullptr, 1, &stepperTaskHandle, 1) != pdPASS) {
     Serial.println("Fehler beim erstellen von Stepper Task");
   }
-  //vTaskSuspend(stepperTaskHandle); // Task vorerst anhalten
+  vTaskSuspend(stepperTaskHandle); // Task vorerst anhalten
 
   if (xTaskCreatePinnedToCore (hotEnd_task, "Hot End Task", 6144, nullptr, 1, &hotEndTaskHandle, 0) != pdPASS) {
     Serial.println("Fehler beim erstellen von Hot End Task");
@@ -85,7 +93,7 @@ void setup(){
   if (xTaskCreatePinnedToCore (serial_task, "Serial Task", 6144, nullptr, 1, &serialTaskHandle, 0) != pdPASS) {
     Serial.println("Fehler beim erstellen von Serial Task");
   }
-  vTaskSuspend(serialTaskHandle); // Task vorerst anhalten
+  //vTaskSuspend(serialTaskHandle); // Task vorerst anhalten
 }
 
 void loop(){
@@ -167,7 +175,27 @@ void hotEnd_task(void* parameters){
 
 void serial_task(void* parameters){
   for(;;){
+    if(my_GUI.get_serial_input(&heater_temp_target, &extrusion_per_min_in_mm, &hot_end_abschalten)==true){
+      //printe Daten (zum Debuggen)
+      Serial.println("Empfangene Daten:");
+      Serial.println("Temperatur");
+      Serial.println(heater_temp_target);
+      Serial.println("Vorschub");
+      Serial.println(extrusion_per_min_in_mm);
+      Serial.println("Abschalten?");
+      Serial.println(hot_end_abschalten);
+      
+      //------ starte Messung ---------//
 
+      //resume andere Tasks
+      vTaskResume(loadCellTaskHandle);
+      vTaskResume(NTCTaskHandle);
+      vTaskResume(stepperTaskHandle);
+      vTaskResume(hotEndTaskHandle);
+
+      //suspend serial_task
+      vTaskSuspend(serialTaskHandle);
+    }
     vTaskDelay(pdMS_TO_TICKS(200));
   }
 }
