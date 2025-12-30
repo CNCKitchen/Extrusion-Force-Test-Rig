@@ -155,10 +155,13 @@ void rotEncoder_task(void* parameters){
   for(;;){
     float ist = myEncoder.get_length();
     float soll = extruder.getExtrudedMmSinceStart();
+    float schlupf = (1-(ist/soll))*100   //schlupf in %
     Serial.print(">Ist length:");
     Serial.println(ist);
     Serial.print(">Soll length:");
     Serial.println(soll);
+    Serial.print(">Schlupf %:");
+    Serial.println(schlupf);
     vTaskDelay(pdMS_TO_TICKS(100));
   }
 }
