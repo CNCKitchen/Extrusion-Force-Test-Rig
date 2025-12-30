@@ -51,6 +51,27 @@ void Encoder::pcnt_init() {
 float Encoder::calc_length(uint32_t totalPulses) {
   return (float)totalPulses / (float)Pulses_per_mm;
 }
+
+uint8_t Encoder::reset(){
+  _overflowCount = 0;
+  pcnt_counter_pause(PCNT_UNIT);
+  if(!pcnt_counter_clear(PCNT_UNIT)){
+    return 1;
+  }
+  else {
+    return 0;
+  }
+}
+
+uint8_t Encoder::start_counter (){
+  if(!pcnt_counter_resume(PCNT_UNIT)){
+    return 1;
+  }
+  else {
+    return 0;
+  }
+}
+
 float Encoder::get_length (){
     int16_t count = 0;
     pcnt_get_counter_value(PCNT_UNIT, &count);    // Read current 0..32767 hardware count
@@ -63,5 +84,6 @@ float Encoder::get_length (){
     //pcnt_counter_clear(PCNT_UNIT);                // Clear hardware counter for next window
    // overflowCount = 0;                            // Clear software overflow extension
 }
+
 
 
