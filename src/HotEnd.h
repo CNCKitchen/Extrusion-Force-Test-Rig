@@ -17,8 +17,9 @@ class HotEnd{
         // Lüfter ansteuern (0..255)
         void setFanPwm(uint8_t pwmValue);
 
-        // NTC-Widerstand in Ohm (gemittelt)
+        // NTC-Spannung in Volt (gemittelt)
         double getNtcVoltage(void);
+        //Kommentar von ballandoSullaTastiera: Warum ist diese Funktion nicht private?
         
         // Temperatur in °C (aus Tabelle + Interpolation)
         float getTemperature();
