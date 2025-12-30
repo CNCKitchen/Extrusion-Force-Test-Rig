@@ -15,7 +15,6 @@ void ExtruderStepper::begin(float maxSpeedStepsPerS, float accelStepsPerS2) {
   pinMode(_enPin,   OUTPUT);
   enable(true);
 
-  // A4988 mag saubere STEP-Pulse
   _stepper.setMinPulseWidth(2);
   _stepper.setPinsInverted(true);
   _stepper.setMaxSpeed(maxSpeedStepsPerS);
@@ -37,7 +36,6 @@ void ExtruderStepper::enable(bool on) {
   else                   digitalWrite(_enPin, on ? HIGH : LOW);
 }
 
-// -------- Konstantgeschwindigkeit ----------
 void ExtruderStepper::setFilamentSpeedMmS(float mm_s) {
   float steps_s = mm_s * _stepsPerMM;              // mm/s -> steps/s
   float maxS    = _stepper.maxSpeed();             // gesetztes Limit
@@ -50,28 +48,6 @@ void ExtruderStepper::setFilamentSpeedMmS(float mm_s) {
 
 void ExtruderStepper::stop() {
   _stepper.setSpeed(0);
-}
-
-// -------- Positionsmodus (falls du weiterhin “Menge” willst) ----------
-void ExtruderStepper::extrudeMM(float mm) {
-  long steps = lroundf(mm * _stepsPerMM);
-  _stepper.move(steps);
-}
-
-bool ExtruderStepper::isRunning() {
-  return _stepper.distanceToGo() != 0;
-}
-
-long ExtruderStepper::distanceToGo() {
-  return _stepper.distanceToGo();
-}
-
-void ExtruderStepper::run() {
-  _stepper.run();
-
-  int32_t now = _stepper.currentPosition();
-  _extrudedSteps += (int64_t)(now - _lastStepPos);
-  _lastStepPos = now;
 }
 
 void ExtruderStepper::runSpeed() {
@@ -93,5 +69,5 @@ long ExtruderStepper::getTimeMsSinceStart() const {
 void ExtruderStepper::resetExtrudedMm() {
   _extrudedSteps = 0;
   _lastStepPos = _stepper.currentPosition();
-  _timeStamp = millis();              // <<< WICHTIG
+  _timeStamp = millis();             
 }

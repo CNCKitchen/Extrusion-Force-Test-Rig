@@ -3,13 +3,19 @@
 #include "HotEnd.h"
 #include "LoadCell.h"
 #include "ExtruderStepper.h"
+#include "Rotary_Encoder.h"
+#include "GUICommunication.h"
+
+// Messung 
+#define MEASURE_TIMER_MIN 0.5 // Zeit einer Messung in Minuten
 
 // Stepper 
 #define EN_PIN     11
 #define STEP_PIN    10
 #define DIR_PIN     9
 
-uint32_t extrusion_per_min_in_mm;
+float extrusion_per_s_in_mm = 0.0f;
+uint32_t extrusion_per_min_in_mm = 0;
 
 // Hot-End
 #define NTC_PIN 4
@@ -34,6 +40,8 @@ uint32_t hot_end_abschalten;
 HotEnd myHotEnd(HEATER_PIN, NTC_PIN, FAN_PIN);
 LoadCell myLoadCell(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
 ExtruderStepper extruder(STEP_PIN, DIR_PIN, EN_PIN);
+Encoder myEncoder(ROTARY_ENCODER_PIN);
+GUICom my_GUI;
 
 //========== Tasks ==========//
 TaskHandle_t loadCellTaskHandle = NULL;
@@ -41,15 +49,19 @@ TaskHandle_t NTCTaskHandle = NULL;
 TaskHandle_t stepperTaskHandle =  NULL;
 TaskHandle_t hotEndTaskHandle = NULL;
 TaskHandle_t serialTaskHandle = NULL;
+TaskHandle_t RotEncoderTaskHandle = NULL;
+TaskHandle_t ControllerTaskHandle = NULL;
 
-// Queue für Temperaturwerte
+// Queue für Temperaturwerte (NTC Task -> Hot End Task)
 QueueHandle_t tempQueueHandle = NULL; 
-#define TEMP_QUEUE_LENGTH 20
+#define TEMP_QUEUE_LENGTH 10
 #define TEMP_QUEUE_SIZE sizeof(float)
 
-//========== Variablen ==========//
-volatile bool measureFlag = false;
-volatile bool tempReached = false;
+// Zeitstempel für Controller Taks
+unsigned long timeStamp = 0;
+
+// Flag falls definierte Temperatur noch nicht erreicht
+bool tempReached = false; 
 
 // ====================== Funktionen-Definitionen ======================//
 void loadCell_task(void* parameters);
@@ -57,6 +69,9 @@ void NTC_task(void* parameters);
 void stepper_task(void* parameters);
 void hotEnd_task(void* parameters);
 void serial_task(void* parameters);
+void rotEncoder_task(void* parameters);
+void controller_task(void* parameters);
+void stopAllActuators(void);
 
 void setup(){
   Serial.begin(115200);
@@ -75,7 +90,7 @@ void setup(){
   if (xTaskCreatePinnedToCore (NTC_task, "NTC Task", 6144, nullptr, 1, &NTCTaskHandle, 0) != pdPASS) {
     Serial.println("Fehler beim erstellen von NTC Task");
   }
-  // vTaskSuspend(NTCTaskHandle); // Task vorerst anhalten
+  vTaskSuspend(NTCTaskHandle); // Task vorerst anhalten
 
   if (xTaskCreatePinnedToCore (stepper_task, "Stepper Task", 6144, nullptr, 1, &stepperTaskHandle, 1) != pdPASS) {
     Serial.println("Fehler beim erstellen von Stepper Task");
@@ -85,7 +100,17 @@ void setup(){
   if (xTaskCreatePinnedToCore (hotEnd_task, "Hot End Task", 6144, nullptr, 1, &hotEndTaskHandle, 0) != pdPASS) {
     Serial.println("Fehler beim erstellen von Hot End Task");
   }
-  //vTaskSuspend(hotEndTaskHandle); // Task vorerst anhalten
+  vTaskSuspend(hotEndTaskHandle); // Task vorerst anhalten
+
+  if (xTaskCreatePinnedToCore (rotEncoder_task, "Rotary Encoder Task", 6144, nullptr, 1, &RotEncoderTaskHandle, 0) != pdPASS) {
+    Serial.println("Fehler beim erstellen von Rotary Encoder Task");
+  }
+  vTaskSuspend(RotEncoderTaskHandle); // Task vorerst anhalten
+
+  if (xTaskCreatePinnedToCore (controller_task, "Controller Task", 6144, nullptr, 1, &ControllerTaskHandle, 0) != pdPASS) {
+    Serial.println("Fehler beim erstellen von Controller Task");
+  }
+  vTaskSuspend(ControllerTaskHandle); // Task vorerst anhalten
 
   if (xTaskCreatePinnedToCore (serial_task, "Serial Task", 6144, nullptr, 1, &serialTaskHandle, 0) != pdPASS) {
     Serial.println("Fehler beim erstellen von Serial Task");
@@ -105,11 +130,8 @@ void loop(){
 void loadCell_task(void* parameters){
   for(;;){
     float wheight = myLoadCell.getMeanWheight(4);
-    Serial.print(">wheight:");
-    Serial.println(wheight, 3);      
-    float length = myEncoder.get_length();
-    Serial.print(">length:");
-    Serial.println(length);
+    //Serial.print(">wheight:");
+    //Serial.println(wheight, 3);      
     vTaskDelay(pdMS_TO_TICKS(100));
   }
 }
@@ -123,15 +145,21 @@ void NTC_task(void* parameters){
 }
 
 void stepper_task(void*) {
-  // Beispiel: konstanter Filamentvorschub in mm/s
-  // (bei Vollschritt ist stepsPerMM ~24.8125, bei 1/16 ~397)
-  const float FEED_MM_S = 5.0f;
-
-  extruder.setFilamentSpeedMmS(FEED_MM_S);
-
   for(;;){
     extruder.runSpeed();
     taskYIELD();  // sehr kurz abgeben, ohne 1ms-Schlaf
+  }
+}
+
+void rotEncoder_task(void* parameters){
+  for(;;){
+    float ist = myEncoder.get_length();
+    float soll = extruder.getExtrudedMmSinceStart();
+    Serial.print(">Ist length:");
+    Serial.println(ist);
+    Serial.print(">Soll length:");
+    Serial.println(soll);
+    vTaskDelay(pdMS_TO_TICKS(100));
   }
 }
 
@@ -142,9 +170,9 @@ void hotEnd_task(void* parameters){
     static float temp = 0;
     if(xQueueReceive(tempQueueHandle, &temp, pdMS_TO_TICKS(10)) != pdPASS) Serial.println("Fehler beim Empfangen der Temperatur");
       Serial.print(">temp:");
-      Serial.println(temp, 2);   // println -> Zeilenumbruch \n
+      Serial.println(temp, 2);   
       
-      if (temp < HEATER_SET_POINT) {
+      if (temp < heater_temp_target) {
         myHotEnd.setHeaterPwm(255);
         myHotEnd.setFanPwm(180);   
       } 
@@ -153,25 +181,33 @@ void hotEnd_task(void* parameters){
         myHotEnd.setFanPwm(180);   
       }
 
-      if (!tempReached && temp >= HEATER_SET_POINT) {
+      if (!tempReached && temp >= heater_temp_target) {
+        timeStamp = millis(); // Zeitstempel setzten wenn Messung beginnt
         tempReached = true;                 
-        if (stepperTaskHandle) {
-          vTaskResume(stepperTaskHandle);   // Stepper läuft ab jetzt dauerhaft
-        }
+        
+        vTaskResume(stepperTaskHandle);
+        extrusion_per_s_in_mm = (float)extrusion_per_min_in_mm / 60.0f;
+        extruder.setFilamentSpeedMmS(extrusion_per_s_in_mm);
+        extruder.enable(true);               // WICHTIG!
+        extruder.resetExtrudedMm(); // muss aufgerufen werden damit Filamentlängenzählung und Zeitzählung neu beginnt
+
+        vTaskResume(RotEncoderTaskHandle);
+        vTaskResume(loadCellTaskHandle);
+        vTaskResume(ControllerTaskHandle);
+        vTaskSuspend(serialTaskHandle);
     }
 
     // Regler
     //const float dt_s = HEATER_DELAY / 1000.0f;  
     //myHotEnd.piController(temp, dt_s,HEATER_SET_POINT);
-
     vTaskDelay(pdMS_TO_TICKS(HEATER_DELAY));
-      
     }
 }
 
 void serial_task(void* parameters){
   for(;;){
     if(my_GUI.get_serial_input(&heater_temp_target, &extrusion_per_min_in_mm, &hot_end_abschalten)==true){
+
       //printe Daten (zum Debuggen)
       Serial.println("Empfangene Daten:");
       Serial.println("Temperatur");
@@ -180,18 +216,54 @@ void serial_task(void* parameters){
       Serial.println(extrusion_per_min_in_mm);
       Serial.println("Abschalten?");
       Serial.println(hot_end_abschalten);
-      
-      //------ starte Messung ---------//
+      // Vorbereitung für neue Messung
+      tempReached = false;                 // WICHTIG!
+      xQueueReset(tempQueueHandle);        // optional, aber sauber
 
-      //resume andere Tasks
-      vTaskResume(loadCellTaskHandle);
+      // Heizen starten
       vTaskResume(NTCTaskHandle);
-      vTaskResume(stepperTaskHandle);
       vTaskResume(hotEndTaskHandle);
-
-      //suspend serial_task
-      vTaskSuspend(serialTaskHandle);
     }
     vTaskDelay(pdMS_TO_TICKS(200));
   }
+}
+
+void controller_task(void* parameters){
+  for(;;){
+    static unsigned long lastPrint = 0;
+    if (millis() - lastPrint >= 1000) {
+      lastPrint = millis();
+      Serial.print("Time:");
+      Serial.println(millis() / 1000);
+    }
+
+    // Timestamp wird im Hot End Task gesetzt sobald Soll Temperatur erreicht 
+    if (timeStamp != 0 && (millis() - timeStamp >= MEASURE_TIMER_MIN * 60UL * 1000UL)) {
+      timeStamp = 0;
+      tempReached = false;
+      stopAllActuators();
+      Serial.println("Die Messung ist abgeschlossen");
+
+      // Alle Sensoren und Aktoren abschalten
+      vTaskSuspend(stepperTaskHandle);
+      vTaskSuspend(hotEndTaskHandle);
+      vTaskSuspend(loadCellTaskHandle);
+      vTaskSuspend(NTCTaskHandle);
+      vTaskSuspend(RotEncoderTaskHandle);
+
+      // Serial Taks wieder wecken
+      vTaskResume(serialTaskHandle);
+
+      // Supsendet Controller Task
+      vTaskSuspend(NULL); 
+    }
+    vTaskDelay(pdMS_TO_TICKS(40));
+  }
+}
+
+void stopAllActuators(void){
+  myHotEnd.setFanPwm(0);
+  myHotEnd.setHeaterPwm(0);
+  extruder.stop();
+  extruder.enable(false);
 }
