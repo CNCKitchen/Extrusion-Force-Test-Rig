@@ -17,7 +17,8 @@ class Encoder{
 
     //========== Funktions-Prototypen  ==========//
     float get_length ();
-
+    uint8_t reset ();
+    uint8_t start_counter ();
 
     private:
     //========== Funktions-Prototypen  ==========//
@@ -30,6 +31,7 @@ class Encoder{
     static volatile int32_t _overflowCount;
 
 };
+
 
 
 
