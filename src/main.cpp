@@ -6,16 +6,15 @@
 #include "Rotary_Encoder.h"
 #include "GUICommunication.h"
 
-// Messung 
-#define MEASURE_TIMER_MIN 1.5 // Zeit einer Messung in Minuten
-
 // Stepper 
 #define EN_PIN     11
 #define STEP_PIN    10
 #define DIR_PIN     9
 
-float extrusion_per_s_in_mm = 0.0f;
-uint32_t extrusion_per_min_in_mm = 300;
+float feedLengthMM = 100.0f;              // vom GUI
+uint32_t extrusion_per_min_in_mm = 0;   // vom GUI (mm/min)
+float extrusion_per_s_in_mm = 0.0f;     // intern (mm/s)
+unsigned long measureTimeMS = 0;        // intern (ms)
 
 // Hot-End
 #define NTC_PIN 4
@@ -71,7 +70,7 @@ void serial_task(void* parameters);
 void rotEncoder_task(void* parameters);
 void controller_task(void* parameters);
 void stopAllActuators(void);
-
+bool computeMeasureTime();
 
 
 void setup(){
@@ -154,11 +153,16 @@ void stepper_task(void*) {
 
 void rotEncoder_task(void* parameters){
   for(;;){
+    
     float ist = myEncoder.get_length();
     float soll = extruder.getExtrudedMmSinceStart();
-    float schlupf = (1-(ist/soll))*100;   //schlupf in %
+    if (soll > 0.001f) {
+    float schlupf = (1.0f - (ist / soll)) * 100.0f; //schlupf in %
     Serial.print(">Schlupf %:");
     Serial.println(schlupf);
+    } else {
+    Serial.println(">Schlupf %:0");
+  }
     vTaskDelay(pdMS_TO_TICKS(100));
   }
 }
@@ -202,13 +206,15 @@ void hotEnd_task(void* parameters){
         tempReached = true;                 
         
         // Stepper
-        vTaskResume(stepperTaskHandle);
-        extrusion_per_s_in_mm = (float)extrusion_per_min_in_mm / 60.0f;
+        extruder.enable(true);
         extruder.setFilamentSpeedMmS(extrusion_per_s_in_mm);
-        extruder.enable(true);               // WICHTIG!
-        extruder.resetExtrudedMm(); // muss aufgerufen werden damit Filamentlängenzählung und Zeitzählung neu beginnt
+        extruder.resetExtrudedMm();
+        vTaskResume(stepperTaskHandle);
+
 
         // Encoder
+        // Encoder reseten
+        if(!myEncoder.reset()) Serial.println("Fehler beim reseten des Encoders");
         if(!myEncoder.start_counter()) Serial.print("Fehler beim Encoderstart");
 
         vTaskResume(RotEncoderTaskHandle);
@@ -239,7 +245,12 @@ void serial_task(void* parameters){
       // Vorbereitung für neue Messung
       tempReached = false;                 // WICHTIG!
       xQueueReset(tempQueueHandle);        // optional, aber sauber
-
+      if (!computeMeasureTime()) {
+        Serial.println("Fehler beim Berechnen der Messzeit");
+        continue;
+      }
+      Serial.print("Measure Zeit:");
+      Serial.println(measureTimeMS);
       // Heizen starten
       vTaskResume(NTCTaskHandle);
       vTaskResume(hotEndTaskHandle);
@@ -250,43 +261,53 @@ void serial_task(void* parameters){
 
 void controller_task(void* parameters){
   for(;;){
-    static unsigned long lastPrint = 0;
-    if (millis() - lastPrint >= 1000) {
-      lastPrint = millis();
-      Serial.print("Time:");
-      Serial.println(millis() / 1000);
+    if (timeStamp != 0 && measureTimeMS != 0 && (millis() - timeStamp >= measureTimeMS)) {
+    timeStamp = 0;
+    measureTimeMS = 0;
+    tempReached = false;
+
+    stopAllActuators();
+    Serial.println("Die Messung ist abgeschlossen");
+
+    if(!myEncoder.reset()) Serial.println("Fehler beim reseten des Encoders");
+
+    vTaskSuspend(stepperTaskHandle);
+    vTaskSuspend(hotEndTaskHandle);
+    vTaskSuspend(loadCellTaskHandle);
+    vTaskSuspend(NTCTaskHandle);
+    vTaskSuspend(RotEncoderTaskHandle);
+
+    vTaskResume(serialTaskHandle);
+    vTaskSuspend(NULL);
     }
-
-    // Timestamp wird im Hot End Task gesetzt sobald Soll Temperatur erreicht 
-    if (timeStamp != 0 && (millis() - timeStamp >= MEASURE_TIMER_MIN * 60UL * 1000UL)) {
-      timeStamp = 0;
-      tempReached = false;
-      stopAllActuators();
-      Serial.println("Die Messung ist abgeschlossen");
-
-      // Encoder reseten
-      if(!myEncoder.reset()) Serial.println("Fehler beim reseten des Encoders");
-
-      // Alle Sensoren und Aktoren abschalten
-      vTaskSuspend(stepperTaskHandle);
-      vTaskSuspend(hotEndTaskHandle);
-      vTaskSuspend(loadCellTaskHandle);
-      vTaskSuspend(NTCTaskHandle);
-      vTaskSuspend(RotEncoderTaskHandle);
-
-      // Serial Taks wieder wecken
-      vTaskResume(serialTaskHandle);
-
-      // Supsendet Controller Task
-      vTaskSuspend(NULL); 
-    }
-    vTaskDelay(pdMS_TO_TICKS(40));
+    vTaskDelay(pdMS_TO_TICKS(20));
   }
 }
+  
 
 void stopAllActuators(void){
   myHotEnd.setFanPwm(0);
   myHotEnd.setHeaterPwm(0);
   extruder.stop();
   extruder.enable(false);
+}
+
+ bool computeMeasureTime(){
+  extrusion_per_s_in_mm = (float)extrusion_per_min_in_mm / 60.0f;  // mm/min -> mm/s
+
+  if (extrusion_per_s_in_mm <= 0.0001f) {
+    Serial.println("Fehler: Geschwindigkeit ist 0");
+    return false;
+  }
+  if (feedLengthMM <= 0.0f) {
+    Serial.println("Fehler: Förderlänge ist 0");
+    return false;
+  }
+
+  float t_s = feedLengthMM / extrusion_per_s_in_mm;  // Sekunden
+  measureTimeMS = (unsigned long)(t_s * 1000.0f);    // Millisekunden
+
+  Serial.print("MeasureTimeMS=");
+  Serial.println(measureTimeMS);
+  return true;
 }
