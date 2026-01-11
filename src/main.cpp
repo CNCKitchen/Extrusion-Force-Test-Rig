@@ -97,8 +97,8 @@ enum MeasureMode: uint8_t{
 volatile MeasureMode gMode = MODE_TIME;
 
 // Stepper-Skip/Slip-Erkennung
-static constexpr float SLIP_TRIGGER_PERCENT = 80.0f;     // Schlupf in % beim welchem abgeschalten werden soll
-static constexpr uint32_t SLIP_HOLD_MS = 300;            // Schlupf muss so lange stattfinden
+static constexpr float SLIP_TRIGGER_PERCENT = 5.0f;     // Schlupf in % beim welchem abgeschalten werden soll
+static constexpr uint32_t SLIP_HOLD_MS = 2000;            // Schlupf muss so lange stattfinden
 static constexpr uint32_t MAX_FORCE_TIMEOUT_MS = 120000; // Safety: 2min max-force Mode
 
 bool heaterLockedOff = false;                   // im Max-Force Mode nach T_soll = true
@@ -356,7 +356,8 @@ void serial_task(void* parameters){
       Serial.println(hot_end_abschalten);
 
       // Modus anhand GUI-Flag wählen
-      gMode = (hot_end_abschalten == 0) ? MODE_TIME : MODE_MAX_FORCE;
+      gMode = (hot_end_abschalten == 1) ? MODE_MAX_FORCE : MODE_TIME;
+
 
       // Messung vorbereiten
       tempReached = false;
@@ -387,6 +388,7 @@ void serial_task(void* parameters){
       vTaskResume(TelemetryTaskHandle);
       vTaskResume(NTCTaskHandle);
       vTaskResume(hotEndTaskHandle);
+      vTaskSuspend(NULL);
     }
 
     vTaskDelay(pdMS_TO_TICKS(200));
