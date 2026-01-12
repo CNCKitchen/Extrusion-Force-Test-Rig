@@ -19,7 +19,7 @@ double LoadCell::getMeanWheight(const uint8_t NUM_SAMPLES){
         count++;
 
         if (count >= NUM_SAMPLES) {
-            int64_t meanAdc = sumAdc / count;          // kein uint32_t-cast!
+            int64_t meanAdc = sumAdc / count;          
             lastWeight = calcWeight((long)meanAdc);
             hasMean = true;
 

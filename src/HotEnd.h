@@ -9,7 +9,7 @@ class HotEnd{
         //========== Konstruktor ==========//   
         HotEnd(const uint8_t gatePin, const uint8_t NTC_Pin, const uint8_t fanPin);
 
-        //========== Funktions-Prototypen  ==========//
+        //========== Funktions-Prototypen Public ==========//
 
         // Heizer ansteuern (0..255)
         void setHeaterPwm(uint8_t pwmValue);
@@ -28,16 +28,15 @@ class HotEnd{
 
     private:
 
-        //========== Funktions-Prototypen  ==========//
+        //========== Funktions-Prototypen Privat ==========//
 
         // aus Widerstand (kΩ) Temperatur interpolieren
         static float temperatureFromResistance(float rKOhm); 
 
         // NTC-Spannung in Volt (gemittelt)
         double getNtcVoltage(void);
-        //Kommentar von ballandoSullaTastiera: Warum ist diese Funktion nicht private?
 
-        //========== Variablen  ==========//
+        //========== Variablen Privat ==========//
 
         // Lüfter
         const uint8_t _fanPin;

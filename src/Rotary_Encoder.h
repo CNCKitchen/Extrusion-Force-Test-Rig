@@ -12,28 +12,25 @@
 class Encoder{
 
     public:
-    //========== Konstruktor ==========//
-    Encoder(const uint8_t dataPin);
 
-    //========== Funktions-Prototypen  ==========//
-    float get_length ();
-    uint8_t reset ();
-    uint8_t start_counter ();
+        //========== Konstruktor ==========//
+        Encoder(const uint8_t dataPin);
+
+        //========== Funktions-Prototypen Public ==========//
+        float get_length ();
+        uint8_t reset ();
+        uint8_t start_counter ();
 
     private:
-    //========== Funktions-Prototypen  ==========//
-    float calc_length(uint32_t totalPulses);
-    void pcnt_init();
-    static void IRAM_ATTR pcnt_intr_handler(void *arg);
 
-    //========== Variablen  ==========//
-    const uint8_t _dataPin;
-    static volatile int32_t _overflowCount;
+        //========== Funktions-Prototypen Privat  ==========//
+        float calc_length(uint32_t totalPulses);
+        void pcnt_init();
+        static void IRAM_ATTR pcnt_intr_handler(void *arg);
 
+        //========== Variablen Privat ==========//
+        const uint8_t _dataPin;
+        static volatile int32_t _overflowCount;
 };
-
-
-
-
 
 #endif

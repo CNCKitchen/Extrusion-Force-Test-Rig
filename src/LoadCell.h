@@ -10,7 +10,7 @@ class LoadCell{
          //========== Konstruktor ==========//
         LoadCell(const uint8_t dataPin, const uint8_t clockPin);
 
-        //========== Funktions-Prototypen  ==========//
+        //========== Funktions-Prototypen Public ==========//
         double getMeanWheight(const uint8_t NUM_SAMPLES);
         double getRawWheight();
         float getForce();
@@ -19,10 +19,10 @@ class LoadCell{
 
     private:
 
-        //========== Funktions-Prototypen  ==========//
+        //========== Funktions-Prototypen Privat ==========//
         double calcWeight(long analogVal);
 
-        //========== Variablen  ==========//
+        //========== Variablen  Privat ==========//
         const uint8_t _dataPin;
         const uint8_t _clockPin;
         HX711 _scale;

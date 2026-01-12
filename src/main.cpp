@@ -12,6 +12,7 @@
 #define STEP_PIN    10
 #define DIR_PIN     9
 
+// Parameter kommen vom GUI
 float feed_rate_per_s_in_mm;
 float feed_length_in_mm;
 
@@ -25,6 +26,7 @@ unsigned long measureTimeMS = 0;
 #define FAN_PIN 7
 #define HEATER_DELAY 100
 
+// Parameter kommen vom GUI
 float heater_temp_target = 180.; 
 uint8_t hot_end_abschalten=0; 
 
@@ -89,11 +91,11 @@ bool tempReached = false;
 // Flag das die Messung läuft
 bool isMeasuring = false;
 
+// States für Messmodi
 enum MeasureMode: uint8_t{
   MODE_TIME = 0,
   MODE_MAX_FORCE = 1
 };
-
 volatile MeasureMode gMode = MODE_TIME;
 
 // Stepper-Skip/Slip-Erkennung
@@ -104,6 +106,7 @@ static constexpr uint32_t MAX_FORCE_TIMEOUT_MS = 120000; // Safety: 2min max-for
 bool heaterLockedOff = false;                   // im Max-Force Mode nach T_soll = true
 
 // ====================== Funktionen-Definitionen ======================//
+// Task Funktionen
 void loadCell_task(void* parameters);
 void NTC_task(void* parameters);
 void stepper_task(void* parameters);
@@ -113,6 +116,7 @@ void rotEncoder_task(void* parameters);
 void controller_task(void* parameters);
 void Telemetry_Task(void* parameters);
 
+// Helfer Funktionen 
 void stopAllActuators(void);
 bool computeMeasureTime();
 void tareLoadCell();
@@ -176,7 +180,6 @@ void setup(){
   if (xTaskCreatePinnedToCore (serial_task, "Serial Task", 6144, nullptr, 1, &serialTaskHandle, 0) != pdPASS) {
     Serial.println("Fehler beim erstellen von Serial Task");
   }
-  //vTaskSuspend(serialTaskHandle); // Task vorerst anhalten
   
 }
 
@@ -197,10 +200,8 @@ void loadCell_task(void* parameters){
       if(xQueueSend(ForceQueueHandle, (void*)&force, 0) != pdPASS){
         xQueueReceive(ForceQueueHandle, (void*)&dummy,0);
         xQueueSend(ForceQueueHandle, (void*)&force, 0);
-      }
-      
-    }
-       
+      }   
+    }     
     vTaskDelay(pdMS_TO_TICKS(100));
   }
 }
@@ -238,16 +239,16 @@ void rotEncoder_task(void* parameters){
     if(isMeasuring){
        if (soll > 0.001f) {
 
-      float schlupf = (1.0f - (ist / soll)) * 100.0f; //schlupf in %
-      if(xQueueSend(SlipTelemetryQueueHandle, (void*)&schlupf, 0) != pdPASS){
-        xQueueReceive(SlipTelemetryQueueHandle, (void*)&dummy,0);
-        xQueueSend(SlipTelemetryQueueHandle, (void*)&schlupf, 0);
-      }
-      if(xQueueSend(SlipControllerQueueHandle, (void*)&schlupf, 0) != pdPASS){
-        xQueueReceive(SlipControllerQueueHandle, (void*)&dummy,0);
-        xQueueSend(SlipControllerQueueHandle, (void*)&schlupf, 0);
-      }
-
+        float schlupf = (1.0f - (ist / soll)) * 100.0f; //schlupf in %
+        
+        if(xQueueSend(SlipTelemetryQueueHandle, (void*)&schlupf, 0) != pdPASS){
+          xQueueReceive(SlipTelemetryQueueHandle, (void*)&dummy,0);
+          xQueueSend(SlipTelemetryQueueHandle, (void*)&schlupf, 0);
+        }
+        if(xQueueSend(SlipControllerQueueHandle, (void*)&schlupf, 0) != pdPASS){
+          xQueueReceive(SlipControllerQueueHandle, (void*)&dummy,0);
+          xQueueSend(SlipControllerQueueHandle, (void*)&schlupf, 0);
+        }
       } 
       else {
 
@@ -260,6 +261,7 @@ void rotEncoder_task(void* parameters){
         xQueueReceive(SlipControllerQueueHandle, (void*)&dummy,0);
         xQueueSend(SlipControllerQueueHandle, (void*)&schlupf_0, 0);
         }
+
       }
     } 
     vTaskDelay(pdMS_TO_TICKS(100));
@@ -321,7 +323,6 @@ void hotEnd_task(void* parameters){
       vTaskResume(RotEncoderTaskHandle);
       vTaskResume(loadCellTaskHandle);
       vTaskResume(ControllerTaskHandle);
-      vTaskSuspend(serialTaskHandle);
       Serial.println("begin"); //meldet der GUI, dass Aufheizen zuende und Messung beginnt
     }
     // Regler
@@ -344,7 +345,7 @@ void serial_task(void* parameters){
 
     if(gotCmd){
 
-      //printe Daten (zum Debuggen)
+      //printe Daten 
       Serial.println("Empfangene Daten:");
       Serial.println("Temperatur");
       Serial.println(heater_temp_target);
@@ -381,16 +382,12 @@ void serial_task(void* parameters){
       else {
         measureTimeMS = 0; // im Max-Force Mode wird nicht nach Zeit gestoppt
       }
-      //Serial.print("Measure Zeit:");
-      //Serial.println(measureTimeMS);
-
       // Heizen starten
       vTaskResume(TelemetryTaskHandle);
       vTaskResume(NTCTaskHandle);
       vTaskResume(hotEndTaskHandle);
-      vTaskSuspend(NULL);
+      vTaskSuspend(NULL);   // Serial Task anhalten
     }
-
     vTaskDelay(pdMS_TO_TICKS(200));
   }
 }
@@ -407,7 +404,7 @@ void controller_task(void* parameters){
       slipAboveSince = 0;
     }
 
-    bool stopNow = false;
+    bool stopNow = false; // Flag zu beenden der Messung bei Zeitablauf oder zu viel Slip
 
     if (isMeasuring && timeStamp != 0) {
 
@@ -466,33 +463,8 @@ void controller_task(void* parameters){
       vTaskResume(serialTaskHandle);
       vTaskSuspend(NULL);
     }
-
     vTaskDelay(pdMS_TO_TICKS(20));
   }
-
-  /*
-  for(;;){
-    if (timeStamp != 0 && measureTimeMS != 0 && (millis() - timeStamp >= measureTimeMS)) {
-    timeStamp = 0;
-    measureTimeMS = 0;
-    tempReached = false;
-    isMeasuring = false;
-    stopAllActuators();
-    Serial.println("end"); //teilt der GUI mit, dass die Messung zu Ende ist
-
-    if(!myEncoder.reset()) Serial.println("Fehler beim reseten des Encoders");
-
-    vTaskSuspend(stepperTaskHandle);
-    vTaskSuspend(hotEndTaskHandle);
-    vTaskSuspend(loadCellTaskHandle);
-    vTaskSuspend(NTCTaskHandle);
-    vTaskSuspend(RotEncoderTaskHandle);
-    vTaskSuspend(TelemetryTaskHandle);
-    vTaskResume(serialTaskHandle);
-    vTaskSuspend(NULL);
-    }
-    vTaskDelay(pdMS_TO_TICKS(20));
-  }*/
 }
   
 void Telemetry_Task(void* parameters){
@@ -533,7 +505,6 @@ void stopAllActuators(void){
 bool computeMeasureTime(){ 
   float t_s = feed_length_in_mm / feed_rate_per_s_in_mm;  // Sekunden
   measureTimeMS = (unsigned long)(t_s * 1000.0f);    // Millisekunden
-
   Serial.print("MeasureTimeMS=");
   Serial.println(measureTimeMS);
   return true;
@@ -553,6 +524,6 @@ void tareLoadCell(){
 
   if (wasRunning) vTaskResume(loadCellTaskHandle);
 
-  tare = 0; // optional: verhindert, dass  bei gleicher Flag dauernd neu getared wird
+  tare = 0; 
 
 }

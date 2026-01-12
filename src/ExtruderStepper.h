@@ -4,13 +4,19 @@
 #include <AccelStepper.h>
 
 class ExtruderStepper {
+
   public:
+
+    //========== Konstruktor ==========//
     ExtruderStepper(uint8_t stepPin, uint8_t dirPin, uint8_t enPin);
+
+
+    //========== Funktions-Prototypen Public ==========//
 
     // maxSpeedStepsPerS = maximale Schrittfrequenz (Steps/s)
     void begin(float maxSpeedStepsPerS = 3000.0f, float accelStepsPerS2 = 3000.0f);
 
-    // ====== Konstantgeschwindigkeit (empfohlen für “läuft dauerhaft”) ======
+    // Konstantgeschwindigkeits Betrieb 
     void setFilamentSpeedMmS(float mm_s);   // Vorschub in mm/s (Filament)
     void runSpeed();                        // muss sehr oft aufgerufen werden
     void stop();                            // Geschwindigkeit auf 0
@@ -26,6 +32,9 @@ class ExtruderStepper {
     void  resetExtrudedMm();
 
   private:
+
+    //========== Variablen Privat ==========//
+
     // Hemera Datenblatt: nominal steps/mm bei 1/16 = 397
     static constexpr float _STEPS_PER_MM_X16 = 397.0f;
 

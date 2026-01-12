@@ -1,6 +1,7 @@
 #include "ExtruderStepper.h"
 #include <math.h>
 
+//========== Konstruktor ==========//
 ExtruderStepper::ExtruderStepper(uint8_t stepPin, uint8_t dirPin, uint8_t enPin)
 : _stepPin(stepPin),
   _dirPin(dirPin),
@@ -9,6 +10,8 @@ ExtruderStepper::ExtruderStepper(uint8_t stepPin, uint8_t dirPin, uint8_t enPin)
   _stepper(AccelStepper::DRIVER, stepPin, dirPin)
 {}
 
+
+//========== Öffentliche Funktions-Implementierungen  ==========//
 void ExtruderStepper::begin(float maxSpeedStepsPerS, float accelStepsPerS2) {
   pinMode(_stepPin, OUTPUT);
   pinMode(_dirPin,  OUTPUT);
@@ -40,7 +43,7 @@ void ExtruderStepper::setFilamentSpeedMmS(float mm_s) {
   float steps_s = mm_s * _stepsPerMM;              // mm/s -> steps/s
   float maxS    = _stepper.maxSpeed();             // gesetztes Limit
 
-  if (fabsf(steps_s) > maxS) {                     // clamp
+  if (fabsf(steps_s) > maxS) {                     // Absolut Wert von step_s
     steps_s = (steps_s > 0) ? maxS : -maxS;
   }
   _stepper.setSpeed(steps_s);
