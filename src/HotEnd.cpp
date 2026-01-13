@@ -110,7 +110,7 @@ void HotEnd::piController(float temp, float dt, const float setPoint){
 
 //========== Private Funktions-Implementierungen  ==========//
 
-//neue Tabelle, direkt {voltage [V], temperature[°C]}
+//Tabelle mit Stützwerten, direkt {voltage [V], temperature[°C]}
 const HotEnd::_NtcPoint HotEnd::_ntcTable[HotEnd::_NTC_TABLE_SIZE] = {
     {2.046000, 102.923943},
     {1.653000, 120.719604},
@@ -127,11 +127,10 @@ const HotEnd::_NtcPoint HotEnd::_ntcTable[HotEnd::_NTC_TABLE_SIZE] = {
     {0.119000, 269.375000},
     {0.095000, 279.709290},
     {0.084000, 286.803040}
-    //eventuell nochmals Stüztwert mit 90 Ohm
 };
 
 double HotEnd::getNtcVoltage() {
-    double sum_res = 0.0;
+    double sum_voltage = 0.0;
 
     for (uint16_t i = 0; i < _SAMPLE_COUNT; ++i) {
         uint16_t val_raw = analogRead(_NTCPin);
@@ -139,14 +138,7 @@ double HotEnd::getNtcVoltage() {
         // ADC-Spannung laut ESP
         double U_out_esp = (static_cast<double>(val_raw) * _ADC_VREF) / _ADC_MAX;
 
-        //  Korrektur
-        //double U_out = U_out_esp * (_K_CORR * U_out_esp + _D_CORR); 
-
-        // Spannungsteiler-Formel: U_out = U_b * R_ntc / (R_fixed + R_ntc)
-        // => R_ntc = R_fixed * U_out / (U_b - U_out)
-        //double res_ntc = (_R_FIXED * U_out) / (_ADC_VREF - U_out);
-        //sum_res += res_ntc;
-        sum_res+=U_out_esp;
+        sum_voltage+=U_out_esp;
     }
-    return sum_res / _SAMPLE_COUNT; // Mittelwert in Volt
+    return sum_voltage / _SAMPLE_COUNT; // Mittelwert in Volt
 }
