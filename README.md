@@ -48,7 +48,7 @@ Dieses Repo ist als PlatformIO-Projekt + Python-GUI organisiert:
 ### Firmware (PlatformIO)
 - VS Code + **PlatformIO** Extension
 - HX711 Library by bodge
--AccelStepper Library by Mike McCauley
+- AccelStepper Library by Mike McCauley
 
 ### PC-GUI (Python)
 - Python **3.10+** empfohlen
