@@ -7,12 +7,12 @@ class GUICom{
     
     public:
 
-        //========== Konstruktor ==========// 
-        GUICom(); //keine Pins zu übergeben
+        //========== Constructor ==========// 
+        GUICom(); // no pins to pass
 
-        //========== Funktions-Prototypen Public ==========//
+        //========== Public Function Prototypes ==========//
 
-        //überprüft, ob es input von der GUI gibt und schreibt diesen ggf. in die Variablen
+        // checks if there is input from GUI and writes it to variables if applicable
         bool get_serial_input(float* temp, float* feedrate, float* feedlength, uint8_t* shut_off, uint8_t* tare);
 
 
@@ -22,17 +22,17 @@ class GUICom{
             String temp_string;
             String feedrate_string;
             String feedlength_string;
-            String abschalten_string;
-        }mess_parameter_string;
+            String turn_off_string;
+        }measurement_parameter_string;
 
 
-        //========== Funktions-Prototypen Private ==========//
+        //========== Private Function Prototypes ==========//
 
-        //konvertiert Zahlen-String zu float
+        // converts number string to float
         float string_to_float(String text);
 
-        //spaltet empfangenen String in Teilstrings aus Zahlen auf
-        void split_string(String raw_string, mess_parameter_string* pStruct);
+        // splits received string into substrings of numbers
+        void split_string(String raw_string, measurement_parameter_string* pStruct);
 
 };
 #endif

@@ -1,123 +1,122 @@
-# PID Temperature Controller - Dokumentation
+# PID Temperature Controller - Documentation
 
-CNC Kitchen modification.
 
-## Übersicht
+## Overview
 
-Das System verwendet jetzt einen vollständigen PID-Regler (Proportional-Integral-Derivative) für die Temperaturkontrolle des Hot-Ends. Der alte einfache On-Off-Controller wurde durch einen professionellen PID-Regler mit Auto-Tuning-Funktion ersetzt.
+The system now uses a complete PID controller (Proportional-Integral-Derivative) for hot-end temperature control. The old simple on-off controller has been replaced with a professional PID controller with auto-tuning function.
 
-## Funktionen
+## Functions
 
-### 1. PID-Regler
+### 1. PID Controller
 
-Der PID-Regler bietet:
-- **P-Anteil (Proportional)**: Reagiert direkt auf die Abweichung von der Zieltemperatur
-- **I-Anteil (Integral)**: Eliminiert bleibende Regelabweichungen
-- **D-Anteil (Derivative)**: Dämpft Überschwinger und verbessert die Stabilität
-- **Anti-Windup**: Verhindert Integral-Sättigung
-- **Sicherheitsgrenzen**: Automatisches Abschalten bei Über-/Unterschreitung
+The PID controller offers:
+- **P component (Proportional)**: Responds directly to the deviation from target temperature
+- **I component (Integral)**: Eliminates steady-state control errors
+- **D component (Derivative)**: Dampens overshoot and improves stability
+- **Anti-Windup**: Prevents integral saturation
+- **Safety limits**: Automatic shutdown on over/undershoot
 
-### 2. Auto-Tuning (Ziegler-Nichols Relay-Methode)
+### 2. Auto-Tuning (Ziegler-Nichols Relay Method)
 
-Das System kann automatisch die optimalen PID-Parameter für eine gegebene Zieltemperatur ermitteln.
+The system can automatically determine the optimal PID parameters for a given target temperature.
 
-#### Funktionsweise:
-1. Das System erzeugt eine Oszillation durch Relay-Kontrolle (Ein/Aus)
-2. Misst die Amplitude und Periode der Oszillation
-3. Berechnet nach Ziegler-Nichols die optimalen Kp, Ki, Kd Werte
-4. Speichert die Parameter automatisch
+#### How it works:
+1. The system generates an oscillation through relay control (on/off)
+2. Measures the amplitude and period of oscillation
+3. Calculates optimal Kp, Ki, Kd values according to Ziegler-Nichols
+4. Saves the parameters automatically
 
-## Verwendung
+## Usage
 
-### Auto-Tuning durchführen
+### Performing Auto-Tuning
 
-Um die PID-Parameter für eine bestimmte Temperatur zu optimieren:
+To optimize the PID parameters for a specific temperature:
 
-1. **Wichtig**: Stelle sicher, dass KEINE Messung läuft
-2. Sende folgenden Befehl über die serielle Schnittstelle:
+1. **Important**: Make sure NO measurement is running
+2. Send the following command via serial interface:
    ```
-   AUTOTUNE:<Temperatur>
+   AUTOTUNE:<Temperature>
    ```
-   Beispiel für 200°C:
+   Example for 200°C:
    ```
    AUTOTUNE:200
    ```
 
-3. Der Prozess dauert mehrere Minuten und gibt fortlaufende Statusmeldungen aus
-4. Am Ende werden die optimierten Parameter angezeigt:
+3. The process takes several minutes and provides continuous status messages
+4. At the end, the optimized parameters are displayed:
    ```
-   === Neue PID-Parameter ===
+   === New PID Parameters ===
    Kp: 8.5234
    Ki: 0.4123
    Kd: 2.1567
-   === Auto-Tuning abgeschlossen ===
+   === Auto-Tuning completed ===
    ```
 
-### Manuelle PID-Parameter setzen
+### Setting PID Parameters Manually
 
-Falls du eigene Parameter verwenden möchtest:
+If you want to use custom parameters:
 
 ```
 SETPID:<Kp>,<Ki>,<Kd>
 ```
 
-Beispiel:
+Example:
 ```
 SETPID:10.0,0.5,2.0
 ```
 
-### Aktuelle PID-Parameter abfragen
+### Querying Current PID Parameters
 
 ```
 GETPID
 ```
 
-Ausgabe:
+Output:
 ```
-=== Aktuelle PID-Parameter ===
+=== Current PID Parameters ===
 Kp: 8.0000
 Ki: 0.5000
 Kd: 2.0000
 ```
 
-## Standard-Parameter
+## Default Parameters
 
-Die Standard-PID-Parameter beim Start sind:
+The default PID parameters at startup are:
 - **Kp** = 8.0
 - **Ki** = 0.5
 - **Kd** = 2.0
 
-Diese sollten für die meisten Anwendungen bereits gute Ergebnisse liefern, können aber durch Auto-Tuning optimiert werden.
+These should already provide good results for most applications but can be optimized through auto-tuning.
 
-## Tipps für bestes Ergebnis
+## Tips for Best Results
 
-1. **Auto-Tuning bei Betriebstemperatur**: Führe das Auto-Tuning bei der Temperatur durch, die du am häufigsten verwendest
-2. **Umgebungsbedingungen**: Führe das Auto-Tuning unter ähnlichen Bedingungen durch wie deine Messungen (z.B. gleiche Lüftereinstellung)
-3. **Geduld**: Das Auto-Tuning braucht Zeit (5-10 Minuten), um genaue Ergebnisse zu liefern
-4. **Wiederholung**: Bei sehr unterschiedlichen Temperaturbereichen (z.B. 180°C vs. 250°C) kann es sinnvoll sein, separate Tunings durchzuführen
+1. **Auto-Tuning at operating temperature**: Perform auto-tuning at the temperature you use most frequently
+2. **Environmental conditions**: Perform auto-tuning under similar conditions as your measurements (e.g., same fan setting)
+3. **Patience**: Auto-tuning takes time (5-10 minutes) to deliver accurate results
+4. **Repetition**: For very different temperature ranges (e.g., 180°C vs. 250°C), it may make sense to perform separate tunings
 
-## Fehlerbehandlung
+## Error Handling
 
-### Auto-Tuning schlägt fehl
-- Prüfe, ob die Zieltemperatur im gültigen Bereich liegt (50-290°C)
-- Stelle sicher, dass keine Messung läuft
-- Überprüfe die Heizelement- und NTC-Verkabelung
+### Auto-Tuning Fails
+- Check if target temperature is in valid range (50-290°C)
+- Make sure no measurement is running
+- Check heater element and NTC wiring
 
-### Temperatur oszilliert stark
-- Führe ein Auto-Tuning durch
-- Reduziere ggf. den D-Anteil manuell
+### Temperature Oscillates Strongly
+- Perform auto-tuning
+- Reduce D component manually if necessary
 
-### Temperatur erreicht Sollwert nicht
-- Erhöhe den I-Anteil leicht
-- Prüfe die Heizleistung
+### Temperature Doesn't Reach Setpoint
+- Increase I component slightly
+- Check heater power
 
-### Überschwinger beim Aufheizen
-- Erhöhe den D-Anteil
-- Reduziere den P-Anteil leicht
+### Overshoot During Heating
+- Increase D component
+- Reduce P component slightly
 
-## Debug-Ausgaben
+## Debug Output
 
-Während des Betriebs gibt der PID-Regler kontinuierlich Telemetrie-Daten aus:
+During operation, the PID controller continuously outputs telemetry data:
 ```
 >Temp:199.5
 >Setpoint:200.0
@@ -125,12 +124,12 @@ Während des Betriebs gibt der PID-Regler kontinuierlich Telemetrie-Daten aus:
 >Power:23.5
 ```
 
-Diese können mit dem Serial Plotter von Arduino IDE visualisiert werden.
+These can be visualized with the Arduino IDE Serial Plotter.
 
-## Technische Details
+## Technical Details
 
-- **Update-Rate**: 100ms (HEATER_DELAY)
-- **Temperaturbereich**: 0-290°C
-- **PWM-Bereich**: 0-255
-- **Anti-Windup**: Ja, mit dynamischer Begrenzung
-- **Sicherheitsabschaltung**: Bei >290°C oder <0°C
+- **Update rate**: 100ms (HEATER_DELAY)
+- **Temperature range**: 0-290°C
+- **PWM range**: 0-255
+- **Anti-Windup**: Yes, with dynamic limiting
+- **Safety shutdown**: At >290°C or <0°C

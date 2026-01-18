@@ -1,6 +1,6 @@
 #include "HotEnd.h"
 
-//========== Konstruktor ==========//   
+//========== Constructor ==========//   
 
 HotEnd::HotEnd(const uint8_t gatePin, const uint8_t NTC_Pin, const uint8_t fanPin): _gatePin(gatePin), _NTCPin(NTC_Pin), _fanPin(fanPin){
     pinMode(_gatePin,OUTPUT);
@@ -8,7 +8,7 @@ HotEnd::HotEnd(const uint8_t gatePin, const uint8_t NTC_Pin, const uint8_t fanPi
     pinMode(_NTCPin,INPUT);
 }
 
-//========== Öffentliche Funktions-Implementierungen  ==========//
+//========== Public Function Implementations  ==========//
 
 void HotEnd::setHeaterPwm(uint8_t pwmValue) {
     analogWrite(_gatePin, pwmValue);   
@@ -20,30 +20,30 @@ void HotEnd::setFanPwm(uint8_t pwmValue){
 
 float HotEnd::getTemperature() {
     double esp_voltage = getNtcVoltage();
-    float v1; //unterer Stützwert, Spannung
-    float v2; //oberer Stützwert, Spannung
+    float v1; // lower support value, voltage
+    float v2; // upper support value, voltage
     
-    float t1; //unterer Stützwert, Temperatur
-    float t2; //oberer Stützwert, Temperatur
+    float t1; // lower support value, temperature
+    float t2; // upper support value, temperature
 
-    // Unterhalb/oberhalb des Tabellenbereichs clampen
+    // Clamp below/above table range
     if (esp_voltage >= _ntcTable[0].voltageV) {
-        //interpoliere mit Steigung zwischen 0ten und 1ten Element
+        // interpolate with slope between 0th and 1st element
         v1=_ntcTable[0].voltageV;
         v2=_ntcTable[1].voltageV;
         t1=_ntcTable[0].tempC;
         t2=_ntcTable[1].tempC;
     }
     else if (esp_voltage <= _ntcTable[_NTC_TABLE_SIZE - 1].voltageV) {
-        //interpoliere mit Steigung zwischen vorletzten und letzten Element
+        // interpolate with slope between penultimate and last element
         v1=_ntcTable[_NTC_TABLE_SIZE - 2].voltageV;
         v2=_ntcTable[_NTC_TABLE_SIZE - 1].voltageV;
         t1=_ntcTable[_NTC_TABLE_SIZE - 2].tempC;
         t2=_ntcTable[_NTC_TABLE_SIZE - 1].tempC;
     }
     else{
-        bool noch_nicht_gefunden=true;
-        for (size_t i = 0; i < _NTC_TABLE_SIZE - 1 &&noch_nicht_gefunden; ++i) {
+        bool not_yet_found=true;
+        for (size_t i = 0; i < _NTC_TABLE_SIZE - 1 && not_yet_found; ++i) {
             v1 = _ntcTable[i].voltageV;
             v2 = _ntcTable[i + 1].voltageV;
 
@@ -68,9 +68,9 @@ float HotEnd::getPower(uint8_t pwmVal){
 }
 
 void HotEnd::pidController(float temp, float dt, const float setPoint){
-    // Sicherheitsprüfungen
+    // Safety checks
     if (temp > _T_MAX_SAFE) {
-        Serial.println("Maximale Temperatur von 290°C überschritten! Heizer AUS.");
+        Serial.println("Maximum temperature of 290°C exceeded! Heater OFF.");
         _integralTerm   = 0.0f;
         _lastError      = 0.0f;
         _controlOutput  = 0.0f;
@@ -79,7 +79,7 @@ void HotEnd::pidController(float temp, float dt, const float setPoint){
     }
 
     if(temp < 0){
-        Serial.println("Minimale Temperatur von 0°C darf nicht unterschritten werden! Heizer AUS.");
+        Serial.println("Minimum temperature of 0°C must not be undercut! Heater OFF.");
         _integralTerm   = 0.0f;
         _lastError      = 0.0f;
         _controlOutput  = 0.0f;
@@ -87,7 +87,7 @@ void HotEnd::pidController(float temp, float dt, const float setPoint){
         return;
     }
 
-    // Fehlerberechnung
+    // Error calculation
     float error = setPoint - temp;
 
     // P-Anteil
@@ -137,31 +137,31 @@ void HotEnd::pidController(float temp, float dt, const float setPoint){
 }
 
 bool HotEnd::autoTunePID(float targetTemp, float dt) {
-    // Sicherheitsprüfungen
+    // Safety checks
     if (targetTemp > _T_MAX_SAFE) {
-        Serial.println("Zieltemperatur zu hoch für Auto-Tuning!");
+        Serial.println("Target temperature too high for auto-tuning!");
         return false;
     }
 
     float temp = getTemperature();
     
     if (temp < 0 || temp > _T_MAX_SAFE) {
-        Serial.println("Temperatur außerhalb sicherer Grenzen!");
+        Serial.println("Temperature outside safe limits!");
         resetAutoTune();
         return false;
     }
 
-    // Initialisierung beim ersten Aufruf
+    // Initialization on first call
     if (!_isAutoTuning) {
-        Serial.println("=== Auto-Tuning gestartet ===");
-        Serial.print("Zieltemperatur: ");
+        Serial.println("=== Auto-tuning started ===");
+        Serial.print("Target temperature: ");
         Serial.println(targetTemp);
         
         _isAutoTuning = true;
         _tuneSetpoint = targetTemp;
         _tuneStartTime = millis();
         _peakCount = 0;
-        _relayState = true; // Start mit hoher Leistung
+        _relayState = true; // Start with high power
         _lastTemp = temp;
         _wasRising = false;
         
@@ -169,37 +169,37 @@ bool HotEnd::autoTunePID(float targetTemp, float dt) {
         _integralTerm = 0.0f;
         _lastError = 0.0f;
         
-        return false; // Noch nicht fertig
+        return false; // Not finished yet
     }
 
-    // Timeout-Check (max. 10 Minuten)
+    // Timeout check (max. 10 minutes)
     if ((millis() - _tuneStartTime) > 600000) {
-        Serial.println("Auto-Tuning Timeout!");
+        Serial.println("Auto-tuning timeout!");
         resetAutoTune();
         return false;
     }
 
-    // Relay-Kontrolle: Schalte zwischen hoher und niedriger Leistung
+    // Relay control: Switch between high and low power
     if (_relayState) {
-        // Hohe Leistung bis Zieltemperatur überschritten
+        // High power until target temperature exceeded
         setHeaterPwm(static_cast<uint8_t>(_tuneOutputStep + 100));
         if (temp > _tuneSetpoint) {
             _relayState = false;
         }
     } else {
-        // Niedrige/keine Leistung bis unter Zieltemperatur
+        // Low/no power until below target temperature
         setHeaterPwm(50);
         if (temp < _tuneSetpoint) {
             _relayState = true;
         }
     }
 
-    // Erkennung von Temperatur-Peaks (Maxima und Minima)
+    // Detection of temperature peaks (maxima and minima)
     bool isRising = (temp > _lastTemp);
     
-    // Peak erkannt wenn Richtungswechsel
+    // Peak detected when direction change
     if (_wasRising && !isRising && _peakCount < _MAX_PEAKS) {
-        // Maximum erkannt
+        // Maximum detected
         _peakHigh[_peakCount] = _lastTemp;
         _peakTime[_peakCount] = millis();
         _peakCount++;
@@ -240,41 +240,41 @@ bool HotEnd::autoTunePID(float targetTemp, float dt) {
         float period_ms = periodSum / (_peakCount - 2);
         float period_s = period_ms / 1000.0f;
         
-        // Ultimate Gain (Ku) und Ultimate Period (Tu)
+        // Ultimate Gain (Ku) and Ultimate Period (Tu)
         float Ku = (4.0f * _tuneOutputStep) / (3.14159f * amplitude);
         float Tu = period_s;
         
         Serial.print("Amplitude: ");
         Serial.println(amplitude);
-        Serial.print("Periode (s): ");
+        Serial.print("Period (s): ");
         Serial.println(Tu);
         Serial.print("Ku: ");
         Serial.println(Ku);
         
-        // Ziegler-Nichols PID-Regeln
+        // Ziegler-Nichols PID rules
         _Kp = 0.6f * Ku;
         _Ki = 1.2f * Ku / Tu;
         _Kd = 0.075f * Ku * Tu;
         
-        Serial.println("=== Neue PID-Parameter ===");
+        Serial.println("=== New PID Parameters ===");
         Serial.print("Kp: ");
         Serial.println(_Kp);
         Serial.print("Ki: ");
         Serial.println(_Ki);
         Serial.print("Kd: ");
         Serial.println(_Kd);
-        Serial.println("=== Auto-Tuning abgeschlossen ===");
+        Serial.println("=== Auto-tuning completed ===");
         
         _isAutoTuning = false;
         
-        // Normalen Betrieb fortsetzen
+        // Continue normal operation
         _integralTerm = 0.0f;
         _lastError = 0.0f;
         
-        return true; // Tuning erfolgreich abgeschlossen
+        return true; // Tuning successfully completed
     }
     
-    return false; // Noch nicht fertig
+    return false; // Not finished yet
 }
 
 void HotEnd::resetAutoTune() {
@@ -283,7 +283,7 @@ void HotEnd::resetAutoTune() {
     _integralTerm = 0.0f;
     _lastError = 0.0f;
     setHeaterPwm(0);
-    Serial.println("Auto-Tuning zurückgesetzt");
+    Serial.println("Auto-tuning reset");
 }
 
 void HotEnd::setPIDParameters(float kp, float ki, float kd) {
@@ -295,7 +295,7 @@ void HotEnd::setPIDParameters(float kp, float ki, float kd) {
     _integralTerm = 0.0f;
     _lastError = 0.0f;
     
-    Serial.println("PID-Parameter gesetzt:");
+    Serial.println("PID parameters set:");
     Serial.print("Kp: ");
     Serial.println(_Kp);
     Serial.print("Ki: ");
@@ -311,9 +311,9 @@ void HotEnd::getPIDParameters(float& kp, float& ki, float& kd) const {
 }
 
 
-//========== Private Funktions-Implementierungen  ==========//
+//========== Private Function Implementations  ==========//
 
-//Tabelle mit Stützwerten, direkt {voltage [V], temperature[°C]}
+// Table with support points, directly {voltage [V], temperature[°C]}
 const HotEnd::_NtcPoint HotEnd::_ntcTable[HotEnd::_NTC_TABLE_SIZE] = {
     {2.046000, 102.923943},
     {1.653000, 120.719604},
@@ -338,10 +338,10 @@ double HotEnd::getNtcVoltage() {
     for (uint16_t i = 0; i < _SAMPLE_COUNT; ++i) {
         uint16_t val_raw = analogRead(_NTCPin);
 
-        // ADC-Spannung laut ESP
+        // ADC voltage according to ESP
         double U_out_esp = (static_cast<double>(val_raw) * _ADC_VREF) / _ADC_MAX;
 
         sum_voltage+=U_out_esp;
     }
-    return sum_voltage / _SAMPLE_COUNT; // Mittelwert in Volt
+    return sum_voltage / _SAMPLE_COUNT; // Average in volts
 }

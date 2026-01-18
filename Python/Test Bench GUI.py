@@ -18,13 +18,13 @@ import serial.tools.list_ports
 # %%
 
 """
-globale Variablen
+Global Variables
 """
 
 baud_rate=115200
 
-schrift_klein=12
-schrift_gross=15
+font_small=12
+font_large=15
 
 
 min_temp=180 #Temperatur in Grad Celsius, die nicht unterschritten werden darf
@@ -39,39 +39,39 @@ VENDOR_ID = 0x1A86
 PRODUCT_ID = 0x55D3
 
 
-#Listen zum Speichern der empfangenen Messdaten
+# Lists to store received measurement data
 time_list=[]
 temp_list=[]
 force_list=[]
 slip_list=[]
 
-init_time=-1. # Zeitwert von esp wenn Messung startet (in Millisekunden)
+init_time=-1. # Time value from ESP when measurement starts (in milliseconds)
 
-gesamtzeit=100. #in Sekunden
+total_time=100. # in seconds
 
-plot_cnt=0 #zählt bis wieder geplottet werden soll
+plot_cnt=0 # counts until plotting should happen again
 
 # %%
 
 """
-Funktionen
+Functions
 """
 
 def find_esp32_port(vendor_id, product_id):
     """
-    Sucht den Port, an dem der ESP angeschlossen ist
+    Searches for the port where the ESP is connected
 
     Parameters
     ----------
     vendor_id : int
-        ID des Herstellers
+        Manufacturer ID
     product_id : int
-        ID des Produkts
+        Product ID
 
     Returns
     -------
     TYPE
-        Port des ESP oder none
+        ESP port or none
 
     """
     ports = serial.tools.list_ports.comports()
@@ -83,18 +83,18 @@ def find_esp32_port(vendor_id, product_id):
 
 def check_for_float(num):
     """
-    Überprüft, ob string als float interpretierbar ist
+    Checks if string can be interpreted as float
 
     Parameters
     ----------
     num : string
-        zu überprüfenden String
+        String to be checked
 
     Returns
     -------
     bool
-        true, falls string als float interpretierbar ist
-        false, sonst
+        true if string can be interpreted as float
+        false otherwise
 
     """
     if num==None:
@@ -108,8 +108,8 @@ def check_for_float(num):
 
 def check_data():
     """
-    Überprüft, ob die Eingaben korrekt sind und ruft send_data auf, falls das
-    der Fall ist
+    Checks if the inputs are correct and calls send_data if that
+    is the case
 
     Returns
     -------
@@ -138,14 +138,14 @@ def check_data():
         all_right=False
     
     if all_right:
-        #falls kein Eingabefehler
+        # if no input error
         instruction_label.configure(text="Extrusion test started!",foreground="green")
-        #calculate_flow_rate aufrufen
+        # call calculate_flow_rate
         calculate_flow_rate()
-        #send_data aufrufen
+        # call send_data
         send_data()
     else:
-        #falls Eingabefehler:
+        # if input error:
         instruction_label.configure(text="Some entries are invalid!",foreground="red")
         
         
@@ -153,7 +153,7 @@ def check_data():
         
 def send_data():
     """
-    Sendet die eingegebenen Parameter an den ESP
+    Sends the entered parameters to the ESP
 
     Returns
     -------
@@ -177,12 +177,12 @@ def send_data():
         ser.write(data.encode('utf-8'))
         print("Sent:",data)
     except serial.SerialException as e:
-        print(f"Serial error bei Senden: {e}")
+        print(f"Serial error while sending: {e}")
 
 
 def send_tare():
     """
-    Sendet einen tare-Befehl an den ESP
+    Sends a tare command to the ESP
 
     Returns
     -------
@@ -195,12 +195,12 @@ def send_tare():
         ser.write(data.encode('utf-8'))
         print("Sent:",data)
     except serial.SerialException as e:
-        print(f"Serial error bei tare: {e}")
+        print(f"Serial error in tare: {e}")
         
 def calculate_flow_rate():
     """
-    Berechnet die flow rate und lässt sie auf der GUI anzeigen
-    Berechnet die voraussichtliche Dauer der Messung
+    Calculates the flow rate and displays it on the GUI
+    Calculates the expected duration of the measurement
 
     Returns
     -------
@@ -213,14 +213,14 @@ def calculate_flow_rate():
     flowrate_display.delete(0,tk.END)
     flowrate_display.insert(tk.END, str(flow_rate))
     
-    #Gesamtzeit berechnen
+    # Calculate total time
     feed_length=float(feedlength_entry.get())
-    global gesamtzeit
-    gesamtzeit=feed_length/feed_rate    
+    global total_time
+    total_time=feed_length/feed_rate    
         
 def check_serial():
     """
-    Empfängt und verarbeitet Daten vom ESP
+    Receives and processes data from the ESP
 
     Returns
     -------
@@ -228,15 +228,15 @@ def check_serial():
 
     """
     try:
-        if ser and ser.in_waiting > 0: #falls Daten vom ESP im Buffer
+        if ser and ser.in_waiting > 0: # if data from ESP in buffer
             msg = ser.readline().decode('utf-8')
             
-            #splitter den Input auf
+            # split the input
             parts=msg.split(" ")
             
-            #sortiere die Daten
+            # sort the data
             for part in parts:
-                flag=part[0] #flag markiert die Daten
+                flag=part[0] # flag marks the data
                 global start
                 global temp_list
                 global time_list
@@ -245,41 +245,41 @@ def check_serial():
                 global init_time
                 global plot_cnt
                                 
-                if flag=="t": #time
+                if flag=="t": # time
                     if start:
-                        if init_time<0: #init_time wurde noch nicht gesetzt
+                        if init_time<0: # init_time not yet set
                             init_time=float(part[1:])
                         
                         time_list.append((float(part[1:])-init_time)/1000)
                         update_progress((float(part[1:])-init_time)/1000)
                         plot_cnt+=1
                         
-                elif flag=="c": #temperature
-                    if not(part[1]=="n"): #Wert ist nicht nan
+                elif flag=="c": # temperature
+                    if not(part[1]=="n"): # value is not nan
                         if start:
                             temp_list.append(float(part[1:]))
                         current_temp.delete(0,tk.END)
                         current_temp.insert(tk.END, part[1:])
                     
-                elif flag=="f": #force
-                    if not(part[1]=="n"): #nicht nan
+                elif flag=="f": # force
+                    if not(part[1]=="n"): # not nan
                         if start:
                             force_list.append(float(part[1:]))
                             current_load.delete(0,tk.END)
                             current_load.insert(tk.END, part[1:])
                     
-                elif flag=="s": #slip
-                    if not(part[1]=="n"): #nicht nan
+                elif flag=="s": # slip
+                    if not(part[1]=="n"): # not nan
                         if start:
                             slip_list.append(float(part[1:]))
                             current_slip.delete(0,tk.END)
                             current_slip.insert(tk.END, part[1:])
                             
-                elif flag=="b": #Messung beginnt
+                elif flag=="b": # Measurement begins
                     start=1
-                    print("Messung startet")
+                    print("Measurement starting")
                     
-                elif flag=="e": #Messung ist zu Ende
+                elif flag=="e": # Measurement is finished
                     start=0
                     #schreibe Daten von Listen in csv-File
                     write_to_csv()
@@ -306,62 +306,62 @@ def check_serial():
                 
                     
             
-            # Daten auf Debug-Monitor schreiben
+            # Write data to debug monitor
             monitor_text.insert(tk.END, msg)
             monitor_text.see(tk.END) # Auto-scroll to bottom
             
-            if len(time_list)>1 and plot_cnt==5: #live-plotten, mit 5 neuen Datensätzen
+            if len(time_list)>1 and plot_cnt==5: # live plotting with 5 new datasets
                 plot()
                 plot_cnt=0
-        root.after(5, check_serial) #ruft sich selbst nach 5ms wieder auf
+        root.after(5, check_serial) # calls itself again after 5ms
     except:
         print("No ser found")
     
 def update_progress(current_time):
     """
-    berechnet die prozentualen Fortschritt des Messung und gibt das auf dem
-    Progressbar aus
+    calculates the percentage progress of the measurement and outputs it on the
+    progress bar
 
     Parameters
     ----------
     current_time : float
-        vergangene Zeit seit Messbeginn in Sekunden
+        elapsed time since measurement start in seconds
 
     Returns
     -------
     None.
 
     """
-    #setze Balkenlänge
-    progress_bar["value"]=round(100*current_time/gesamtzeit)
+    # set bar length
+    progress_bar["value"]=round(100*current_time/total_time)
     if progress_bar["value"]>=100:
         progress_bar["value"]=99
-    #setze Zahl auf Balken
+    # set number on bar
     style_progress.configure("text.Horizontal.TProgressbar", 
                      text=str(progress_bar["value"])+"%", anchor="center")
 
 
 def plot():
     """
-    Live-Plotting auf GUI
+    Live plotting on GUI
 
     Returns
     -------
     None.
 
     """
-    min_len=min(len(time_list),len(force_list),len(slip_list)) #minimale Länge der Listen, arrays müssen gleich lang sein
+    min_len=min(len(time_list),len(force_list),len(slip_list)) # minimum length of lists, arrays must be of equal length
     
-    #konvertiere in numpy-arrays
+    # convert to numpy arrays
     t_new=np.array(time_list[0:min_len])
     force_new=np.array(force_list[0:min_len])
     slip_new=np.array(slip_list[0:min_len])
     
-    #Graphen updaten
+    # update graphs
     line_force.set_data(t_new,force_new)
     line_slip.set_data(t_new, slip_new)
     
-    #Achsen updaten
+    # update axes
     ax_force.set_xlim(min(t_new), max(t_new)+1)
     ax_force.set_ylim(min(force_new), max(force_new)+1)
     ax_slip.set_ylim(min(slip_new), max(slip_new)+1)
@@ -371,16 +371,16 @@ def plot():
 
 def write_to_csv():
     """
-    Speichert die empfangenen Messdaten in csv-Datei ab
+    Saves the received measurement data to a CSV file
 
     Returns
     -------
     None.
 
     """
-    min_len=min(len(time_list),len(force_list),len(slip_list), len(temp_list)) #minimale Länge der Listen, arrays müssen gleich lang sein
+    min_len=min(len(time_list),len(force_list),len(slip_list), len(temp_list)) # minimum length of lists, arrays must be of equal length
     
-    #konvertiere in numpy-arrays
+    # convert to numpy arrays
     t_new=np.array(time_list[0:min_len])
     force_new=np.array(force_list[0:min_len])
     slip_new=np.array(slip_list[0:min_len])
@@ -392,7 +392,7 @@ def write_to_csv():
     filename="testfile1.csv"
     
     newname=csv_entry.get()
-    if newname!="": #falls Nutzer individuellen Dateinamen eingegeben hat
+    if newname!="": # if user entered individual filename
         filename=newname+".csv"
         
     turn_off=""
@@ -406,15 +406,15 @@ def write_to_csv():
     
     with open(filename, 'w') as csv_file:
         
-        csv_file.write(title) #parameters
-        csv_file.write("time;temperature;force;slip\n")  #headers
-        np.savetxt(csv_file, data, delimiter=';') #measured data
+        csv_file.write(title) # parameters
+        csv_file.write("time;temperature;force;slip\n")  # headers
+        np.savetxt(csv_file, data, delimiter=';') # measured data
     
     
    
 # %%
 """
-Verbindung mit esp aufbauen
+Establish connection with ESP
 """    
 
 esp32_port = find_esp32_port(VENDOR_ID, PRODUCT_ID)
@@ -435,7 +435,7 @@ root=tk.Tk()
 root.title("Extrusion Test Bench")
 root.configure(background="white")
 
-#GUI soll sich bei resize anpassen
+# GUI should adapt on resize
 root.columnconfigure(0,weight=1)
 root.columnconfigure(1,weight=2)
 root.rowconfigure(0,weight=1)
@@ -443,17 +443,17 @@ root.rowconfigure(1,weight=1)
 
 # %%
 """
-Frame links oben
+Frame left top
 """
 
 frame_entry=tk.Frame(root)
 frame_entry.grid(row=0, column=0, sticky="nsew",padx=20, pady=5) 
 frame_entry.configure(background="white")
 
-entry_label=tk.Label(frame_entry, text="Settings", font=("Arial", schrift_gross, "bold"), background="white")
+entry_label=tk.Label(frame_entry, text="Settings", font=("Arial", font_large, "bold"), background="white")
 entry_label.grid(row=0, column=0, sticky="w", pady=10)
 
-instruction_label=tk.Label(frame_entry, text="Please fill out and press \"START TEST\" or Enter", font=("Arial", schrift_klein, "italic"), background="white")
+instruction_label=tk.Label(frame_entry, text="Please fill out and press \"START TEST\" or Enter", font=("Arial", font_small, "italic"), background="white")
 instruction_label.grid(row=1, column=0, sticky="w", columnspan=2, pady=10)
 
 temp_entry=tk.Entry(frame_entry, background="blue", foreground="white", font=("Arial", schrift_klein, "bold"))
@@ -485,19 +485,19 @@ Hotend_abschalten_check.grid(row=6, column=0, pady=10)
 
 
 """
-Frame links mittig
+Frame left middle
 """
 
 frame_buttons=tk.Frame(root)
 frame_buttons.grid(row=1, column=0, sticky="nsew",padx=20, pady=5, rowspan=1) 
 frame_buttons.configure(background="white")
 
-tare_button=tk.Button(frame_buttons, text="TARE LOAD CELL", font=("Arial", schrift_klein), background="light green", 
+tare_button=tk.Button(frame_buttons, text="TARE LOAD CELL", font=("Arial", font_small), background="light green", 
                       height=2, width=30, command=send_tare)
 tare_button.grid(row=0, column=0, columnspan=2, sticky="we", pady=10)
 
 
-start_button=tk.Button(frame_buttons, text="START TEST", font=("Arial", schrift_klein), background="orange", 
+start_button=tk.Button(frame_buttons, text="START TEST", font=("Arial", font_small), background="orange", 
 
                        height=2, command=check_data)
 start_button.grid(row=1, column=0, columnspan=2, sticky="we")
@@ -505,7 +505,7 @@ start_button.grid(row=1, column=0, columnspan=2, sticky="we")
 
 
 """
-Frame links unten
+Frame left bottom
 """
 
 frame_space=tk.Frame(root)
@@ -513,21 +513,21 @@ frame_space.grid(row=2, column=0, sticky="nsew",padx=5, pady=5)
 frame_space.configure(background="white")
 
 
-csv_entry=tk.Entry(frame_space, background="green", foreground="white", font=("Arial", schrift_klein, "bold"))
+csv_entry=tk.Entry(frame_space, background="green", foreground="white", font=("Arial", font_small, "bold"))
 csv_entry.grid(row=0, column=1)
-csv_entry_label=tk.Label(frame_space, text="Enter filename:", font=("Arial", schrift_klein), background="white")
+csv_entry_label=tk.Label(frame_space, text="Enter filename:", font=("Arial", font_small), background="white")
 csv_entry_label.grid(row=0, column=0, sticky="w", pady=10)
-csv_label=tk.Label(frame_space, text=".csv", font=("Arial", schrift_klein), background="white")
+csv_label=tk.Label(frame_space, text=".csv", font=("Arial", font_small), background="white")
 csv_label.grid(row=0, column=2, sticky="w", pady=10)
 
-#Monitor zum debuggen
+# Monitor for debugging
 monitor_text = st.ScrolledText(frame_space, height=10)
-#monitor_text.grid(row=1, column=0,sticky="sn", columnspan=3)
+# monitor_text.grid(row=1, column=0,sticky="sn", columnspan=3)
 
 # %%
 
 """
-Frame rechts oben
+Frame right top
 """
 
 
@@ -535,38 +535,38 @@ frame_current_data=tk.Frame(root)
 frame_current_data.grid(row=0, column=1, sticky="nsew",padx=5, pady=5) 
 frame_current_data.configure(background="white")
 
-current_label=tk.Label(frame_current_data, text="Live Data", font=("Arial", schrift_gross, "bold"), background="white")
+current_label=tk.Label(frame_current_data, text="Live Data", font=("Arial", font_large, "bold"), background="white")
 current_label.grid(row=0, column=0, sticky="w", pady=10)
 
-current_temp=tk.Listbox(frame_current_data,height=1, background="blue", foreground="white", font=("Arial", schrift_klein, "bold"))
+current_temp=tk.Listbox(frame_current_data,height=1, background="blue", foreground="white", font=("Arial", font_small, "bold"))
 current_temp.grid(row=1, column=0)
-temp_current_label=tk.Label(frame_current_data, text="°C temperature", font=("Arial", schrift_klein), background="white")
+temp_current_label=tk.Label(frame_current_data, text="°C temperature", font=("Arial", font_small), background="white")
 temp_current_label.grid(row=1, column=1, sticky="w", pady=10)
 current_temp.insert(tk.END, "0")
 
-current_load=tk.Listbox(frame_current_data,height=1, background="blue", foreground="white", font=("Arial", schrift_klein, "bold"))
+current_load=tk.Listbox(frame_current_data,height=1, background="blue", foreground="white", font=("Arial", font_small, "bold"))
 current_load.grid(row=2, column=0)
-load_current_label=tk.Label(frame_current_data, text="N load", font=("Arial", schrift_klein), background="white")
+load_current_label=tk.Label(frame_current_data, text="N load", font=("Arial", font_small), background="white")
 load_current_label.grid(row=2, column=1, sticky="w", pady=10)
 current_load.insert(tk.END, "0")
 
-current_slip=tk.Listbox(frame_current_data,height=1, background="blue", foreground="white", font=("Arial", schrift_klein, "bold"))
+current_slip=tk.Listbox(frame_current_data,height=1, background="blue", foreground="white", font=("Arial", font_small, "bold"))
 current_slip.grid(row=3, column=0)
-slip_current_label=tk.Label(frame_current_data, text="% slip", font=("Arial", schrift_klein), background="white")
+slip_current_label=tk.Label(frame_current_data, text="% slip", font=("Arial", font_small), background="white")
 slip_current_label.grid(row=3, column=1, sticky="w", pady=10)
 current_slip.insert(tk.END, "0")
 
 # %%
 
 """
-Frame rechts mittig
+Frame right middle
 """
 
 frame_current_display=tk.Frame(root)
 frame_current_display.grid(row=1, column=1, sticky="nsew",padx=5, pady=5) 
 frame_current_display.configure(background="white")
 
-progress_label=tk.Label(frame_current_display, text="Progress:", font=("Arial", schrift_klein), background="white")
+progress_label=tk.Label(frame_current_display, text="Progress:", font=("Arial", font_small), background="white")
 progress_label.grid(row=0, column=0, sticky="w")
 
 progress_bar=ttk.Progressbar(frame_current_display,mode="determinate", 
@@ -574,7 +574,7 @@ progress_bar=ttk.Progressbar(frame_current_display,mode="determinate",
 progress_bar.grid(row=0, column=1,sticky="we")
 progress_bar["value"]=0
 
-#Style des Progressbars (Prozentzahl mittig auf dem Bar)
+# Style of progress bar (percentage number centered on the bar)
 style_progress=ttk.Style(frame_current_display)
 style_progress.layout("text.Horizontal.TProgressbar",[("Horizontal.Progressbar.trough",
                 {'children': [('Horizontal.Progressbar.pbar',
@@ -588,7 +588,7 @@ style_progress.configure("text.Horizontal.TProgressbar",
 
 # %%
 """
-Frame rechts unten
+Frame right bottom
 """
 
 frame_plot=tk.Frame(root)
@@ -597,7 +597,7 @@ frame_plot.configure(background="white")
 
 
 """
-initialer Plot
+Initial plot
 """
 
 fig = Figure(figsize=(7, 2), dpi=100)
@@ -622,7 +622,7 @@ toolbar.update()
 canvas.get_tk_widget().pack()
 
 # %%
-check_serial() #initiales Aufrufen, ruft sich danach selber auf
-root.mainloop() #erzeugt die GUI
+check_serial() # initial call, then calls itself
+root.mainloop() # creates the GUI
 
-ser.close() #schliesst Port 
+ser.close() # closes port 

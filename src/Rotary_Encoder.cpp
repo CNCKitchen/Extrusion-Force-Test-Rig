@@ -2,14 +2,14 @@
 
 volatile int32_t Encoder::_overflowCount = 0;
 
-//========== Konstruktor ==========//
+//========== Constructor ==========//
 
 Encoder::Encoder(const uint8_t dataPin):_dataPin(dataPin){
     pcnt_init(); 
 }
 
 
-//========== Funktions-Implementierungen Private ==========//
+//========== Private Function Implementations ==========//
 
 // PCNT interrupt handler: called when the hardware counter hits the high limit.
 void IRAM_ATTR Encoder::pcnt_intr_handler(void *arg) {
@@ -57,11 +57,7 @@ float Encoder::calc_length(uint32_t totalPulses) {
 }
 
 
-//========== Funktions-Implementierungen Public ==========//
-
-uint8_t Encoder::reset(){
-  _overflowCount = 0;
-  pcnt_counter_pause(PCNT_UNIT);
+//========== Public Function Implementations ==========//
   if(!pcnt_counter_clear(PCNT_UNIT)){
     return 1;
   }

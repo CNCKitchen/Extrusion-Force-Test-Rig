@@ -1,21 +1,21 @@
 #include "GUICommunication.h"
 
-//========== Konstruktor ==========//
+//========== Constructor ==========//
 
 GUICom::GUICom(){
 
 };
 
-//========== Öffentliche Funktions-Implementierungen  ==========//
+//========== Public Function Implementations  ==========//
 
 bool GUICom::get_serial_input(float* temp_data, float* feedrate, float* feedlength, uint8_t* shut_off, uint8_t* tare){
-    if(Serial.available()>0){ //falls input von GUI vorhanden
+    if(Serial.available()>0){ // if input from GUI available
         String receivedData = Serial.readStringUntil('\n');
         if(receivedData=="tare"){
           *tare=1;
-          return false; //tare startet nicht die Messung
+          return false; // tare does not start measurement
         }else{
-          mess_parameter_string meine_parameter;
+          measurement_parameter_string my_parameters;
           split_string(receivedData, &meine_parameter);
           
           *temp_data=string_to_float(meine_parameter.temp_string);
@@ -29,7 +29,7 @@ bool GUICom::get_serial_input(float* temp_data, float* feedrate, float* feedleng
     }
 };
 
-//========== Private Funktions-Implementierungen  ==========//
+//========== Private Function Implementations  ==========//
 
 float GUICom::string_to_float(String text){
   int length=text.length();
@@ -37,19 +37,19 @@ float GUICom::string_to_float(String text){
   while(point_pos<length && text[point_pos]!='.'){
     point_pos++;
   }
-  String vorKomma=text.substring(0,point_pos);
+  String before_decimal=text.substring(0,point_pos);
   int factor=1;
   float val=0.;
-  for(int i=0; i<vorKomma.length(); i++){
-    val+=(vorKomma[vorKomma.length()-i-1]-'0')*factor;
+  for(int i=0; i<before_decimal.length(); i++){
+    val+=(before_decimal[before_decimal.length()-i-1]-'0')*factor;
     factor*=10;
   }
 
   if(point_pos<length){
-    String nachKomma=text.substring(point_pos+1);
+    String after_decimal=text.substring(point_pos+1);
     float factor=10.;
-    for(int i=0; i<nachKomma.length(); i++){
-      val+=(nachKomma[i]-'0')/factor;
+    for(int i=0; i<after_decimal.length(); i++){
+      val+=(after_decimal[i]-'0')/factor;
       factor*=10.;
     }
   }
@@ -57,7 +57,7 @@ float GUICom::string_to_float(String text){
 }
 
 
-void GUICom::split_string(String raw_string, mess_parameter_string* pStruct){
+void GUICom::split_string(String raw_string, measurement_parameter_string* pStruct){
   int index=raw_string.indexOf(' ');
   pStruct->temp_string=raw_string.substring(0,index);
   raw_string=raw_string.substring(index+1);
@@ -71,6 +71,6 @@ void GUICom::split_string(String raw_string, mess_parameter_string* pStruct){
   raw_string=raw_string.substring(index+1);
 
   index=raw_string.indexOf(' ');
-  pStruct->abschalten_string=raw_string.substring(0,index);
+  pStruct->turn_off_string=raw_string.substring(0,index);
   
 }
