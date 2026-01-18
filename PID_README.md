@@ -1,5 +1,7 @@
 # PID Temperature Controller - Dokumentation
 
+CNC Kitchen modification.
+
 ## Übersicht
 
 Das System verwendet jetzt einen vollständigen PID-Regler (Proportional-Integral-Derivative) für die Temperaturkontrolle des Hot-Ends. Der alte einfache On-Off-Controller wurde durch einen professionellen PID-Regler mit Auto-Tuning-Funktion ersetzt.
