@@ -6,6 +6,19 @@
 #include "Rotary_Encoder.h"
 #include "GUICommunication.h"
 
+/*
+ * PID TEMPERATURE CONTROLLER
+ * 
+ * Das System verwendet einen PID-Regler mit Auto-Tuning für die Temperaturkontrolle.
+ * 
+ * Serial-Befehle:
+ * - AUTOTUNE:<temp>      - Startet Auto-Tuning für gegebene Temperatur (z.B. AUTOTUNE:200)
+ * - SETPID:<kp>,<ki>,<kd> - Setzt PID-Parameter manuell (z.B. SETPID:8.0,0.5,2.0)
+ * - GETPID               - Zeigt aktuelle PID-Parameter an
+ * 
+ * Siehe PID_README.md für Details.
+ */
+
 //========== Stepper ==========//
 
 #define EN_PIN     11
@@ -271,6 +284,8 @@ void rotEncoder_task(void* parameters){
 
 void hotEnd_task(void* parameters){
   myHotEnd.setFanPwm(180);
+  const float dt_s = HEATER_DELAY / 1000.0f;  // Zeitschritt für PID-Regler in Sekunden
+  
   for(;;){
     static float temp = 0;
     while(xQueueReceive(tempHotEndQueueHandle, &temp, 0) == pdPASS){
@@ -278,30 +293,19 @@ void hotEnd_task(void* parameters){
     }
     
     if (heaterLockedOff) {
+      // Im MAX_FORCE Modus: Heizer komplett aus
       myHotEnd.setHeaterPwm(0);
       myHotEnd.setFanPwm(180);
-      } 
+    } 
     else{
-      // normale Heizlogik
-      if (temp >= heater_temp_target) {
-        // über oder am Soll: Heizer aus
-        myHotEnd.setHeaterPwm(0);
-        myHotEnd.setFanPwm(180);
-      }
-      else if (temp >= (heater_temp_target - 20.0f)) {
-        // im Band: 20°C unter Soll bis Soll -> halbe Leistung
-        myHotEnd.setHeaterPwm(128);
-        myHotEnd.setFanPwm(180);
-      }
-      else {
-        // weiter als 20°C unter Soll: Vollgas
-        myHotEnd.setHeaterPwm(255);
-        myHotEnd.setFanPwm(180);
-      }
+      // Normale Temperaturregelung mit PID-Controller
+      myHotEnd.pidController(temp, dt_s, heater_temp_target);
+      myHotEnd.setFanPwm(180);
     }
 
-    if (!tempReached && temp >= heater_temp_target) {
-      timeStamp = millis(); // Zeitstempel setzten wenn Messung beginnt
+    // Prüfe ob Zieltemperatur erreicht wurde (mit Toleranzband)
+    if (!tempReached && temp >= (heater_temp_target - 2.0f) && temp <= (heater_temp_target + 2.0f)) {
+      timeStamp = millis(); // Zeitstempel setzen wenn Messung beginnt
       tempReached = true;                 
       isMeasuring = true;
 
@@ -325,15 +329,101 @@ void hotEnd_task(void* parameters){
       vTaskResume(ControllerTaskHandle);
       Serial.println("begin"); //meldet der GUI, dass Aufheizen zuende und Messung beginnt
     }
-    // PI-Regler --> P und I Wert sind NICHT richtig eingestellt
-    //const float dt_s = HEATER_DELAY / 1000.0f;  
-    //myHotEnd.piController(temp, dt_s,HEATER_SET_POINT);
+    
     vTaskDelay(pdMS_TO_TICKS(HEATER_DELAY));
   }
 }
 
 void serial_task(void* parameters){
   for(;;){
+
+    // Check for auto-tuning command (send "AUTOTUNE:<temperature>" via Serial)
+    if (Serial.available() > 0) {
+      String input = Serial.readStringUntil('\n');
+      input.trim();
+      
+      if (input.startsWith("AUTOTUNE:")) {
+        // Extract target temperature
+        String tempStr = input.substring(9);
+        float tuneTemp = tempStr.toFloat();
+        
+        if (tuneTemp > 50.0f && tuneTemp < 290.0f) {
+          Serial.print("Starte Auto-Tuning für ");
+          Serial.print(tuneTemp);
+          Serial.println("°C...");
+          Serial.println("WICHTIG: Messung darf nicht laufen!");
+          
+          // Ensure measurement is not running
+          if (!isMeasuring && !tempReached) {
+            heater_temp_target = tuneTemp;
+            
+            // Start auto-tuning process
+            vTaskResume(NTCTaskHandle);
+            vTaskResume(hotEndTaskHandle);
+            
+            // Wait for auto-tuning to complete
+            const float dt_s = HEATER_DELAY / 1000.0f;
+            while (!myHotEnd.autoTunePID(tuneTemp, dt_s)) {
+              vTaskDelay(pdMS_TO_TICKS(HEATER_DELAY));
+            }
+            
+            Serial.println("Auto-Tuning abgeschlossen!");
+            
+            // Get and display new parameters
+            float kp, ki, kd;
+            myHotEnd.getPIDParameters(kp, ki, kd);
+            Serial.println("=== Optimierte PID-Parameter ===");
+            Serial.print("Kp: ");
+            Serial.println(kp, 4);
+            Serial.print("Ki: ");
+            Serial.println(ki, 4);
+            Serial.print("Kd: ");
+            Serial.println(kd, 4);
+            
+            vTaskSuspend(hotEndTaskHandle);
+            vTaskSuspend(NTCTaskHandle);
+          } else {
+            Serial.println("FEHLER: Kann Auto-Tuning nicht starten - Messung läuft bereits!");
+          }
+        } else {
+          Serial.println("FEHLER: Ungültige Temperatur (50-290°C)");
+        }
+        continue;
+      }
+      
+      // Check for manual PID parameter setting (send "SETPID:<kp>,<ki>,<kd>")
+      if (input.startsWith("SETPID:")) {
+        String params = input.substring(7);
+        int comma1 = params.indexOf(',');
+        int comma2 = params.lastIndexOf(',');
+        
+        if (comma1 > 0 && comma2 > comma1) {
+          float kp = params.substring(0, comma1).toFloat();
+          float ki = params.substring(comma1 + 1, comma2).toFloat();
+          float kd = params.substring(comma2 + 1).toFloat();
+          
+          myHotEnd.setPIDParameters(kp, ki, kd);
+          Serial.println("PID-Parameter manuell gesetzt");
+        } else {
+          Serial.println("FEHLER: Format: SETPID:<kp>,<ki>,<kd>");
+        }
+        continue;
+      }
+      
+      // Check for PID parameter query
+      if (input == "GETPID") {
+        float kp, ki, kd;
+        myHotEnd.getPIDParameters(kp, ki, kd);
+        Serial.println("=== Aktuelle PID-Parameter ===");
+        Serial.print("Kp: ");
+        Serial.println(kp, 4);
+        Serial.print("Ki: ");
+        Serial.println(ki, 4);
+        Serial.print("Kd: ");
+        Serial.println(kd, 4);
+        continue;
+      }
+    }
 
     bool gotCmd = my_GUI.get_serial_input(&heater_temp_target, &feed_rate_per_s_in_mm, &feed_length_in_mm, &hot_end_abschalten, &tare);
 
